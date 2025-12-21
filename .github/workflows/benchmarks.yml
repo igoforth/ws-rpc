@@ -38,8 +38,8 @@ jobs:
       - name: Run benchmarks
         id: bench
         run: |
-          # Run benchmarks and capture output
-          pnpm bench 2>&1 | tee benchmark-output.txt
+          # Run benchmarks and strip ANSI color codes
+          pnpm bench 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tee benchmark-output.txt
 
           # Parse wire sizes from logSizes output lines
           SMALL_LINE=$(grep 'Small:' benchmark-output.txt | head -1)
@@ -61,23 +61,22 @@ jobs:
 
           # Extract throughput (hz) from benchmark results
           # Lines look like: "   · JSON         2,513.18  0.0453 ..."
-          # Field $3 is the hz value after removing commas
-          # Benchmarks run in order: Small (JSON, MsgPack, CBOR), Medium (...), Large (...)
+          # Use sed to extract the hz value (first number after codec name)
 
-          # Small payload section (between "Small payload" and "Medium payload")
-          SMALL_JSON_HZ=$(awk '/Small payload - RPC/,/Medium payload - RPC/ { if (/· JSON/) { gsub(",", ""); print $3 } }' benchmark-output.txt | head -1)
-          SMALL_MSGPACK_HZ=$(awk '/Small payload - RPC/,/Medium payload - RPC/ { if (/· MessagePack/) { gsub(",", ""); print $3 } }' benchmark-output.txt | head -1)
-          SMALL_CBOR_HZ=$(awk '/Small payload - RPC/,/Medium payload - RPC/ { if (/· CBOR/) { gsub(",", ""); print $3 } }' benchmark-output.txt | head -1)
+          # Small payload section
+          SMALL_JSON_HZ=$(sed -n '/Small payload - RPC/,/Medium payload - RPC/p' benchmark-output.txt | grep -E 'JSON\s+[0-9]' | head -1 | sed 's/,//g' | awk '{for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.[0-9]+$/) {print $i; exit}}')
+          SMALL_MSGPACK_HZ=$(sed -n '/Small payload - RPC/,/Medium payload - RPC/p' benchmark-output.txt | grep -E 'MessagePack\s+[0-9]' | head -1 | sed 's/,//g' | awk '{for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.[0-9]+$/) {print $i; exit}}')
+          SMALL_CBOR_HZ=$(sed -n '/Small payload - RPC/,/Medium payload - RPC/p' benchmark-output.txt | grep -E 'CBOR\s+[0-9]' | head -1 | sed 's/,//g' | awk '{for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.[0-9]+$/) {print $i; exit}}')
 
-          # Medium payload section (between "Medium payload" and "Large payload")
-          MEDIUM_JSON_HZ=$(awk '/Medium payload - RPC/,/Large payload - RPC/ { if (/· JSON/) { gsub(",", ""); print $3 } }' benchmark-output.txt | head -1)
-          MEDIUM_MSGPACK_HZ=$(awk '/Medium payload - RPC/,/Large payload - RPC/ { if (/· MessagePack/) { gsub(",", ""); print $3 } }' benchmark-output.txt | head -1)
-          MEDIUM_CBOR_HZ=$(awk '/Medium payload - RPC/,/Large payload - RPC/ { if (/· CBOR/) { gsub(",", ""); print $3 } }' benchmark-output.txt | head -1)
+          # Medium payload section
+          MEDIUM_JSON_HZ=$(sed -n '/Medium payload - RPC/,/Large payload - RPC/p' benchmark-output.txt | grep -E 'JSON\s+[0-9]' | head -1 | sed 's/,//g' | awk '{for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.[0-9]+$/) {print $i; exit}}')
+          MEDIUM_MSGPACK_HZ=$(sed -n '/Medium payload - RPC/,/Large payload - RPC/p' benchmark-output.txt | grep -E 'MessagePack\s+[0-9]' | head -1 | sed 's/,//g' | awk '{for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.[0-9]+$/) {print $i; exit}}')
+          MEDIUM_CBOR_HZ=$(sed -n '/Medium payload - RPC/,/Large payload - RPC/p' benchmark-output.txt | grep -E 'CBOR\s+[0-9]' | head -1 | sed 's/,//g' | awk '{for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.[0-9]+$/) {print $i; exit}}')
 
-          # Large payload section (between "Large payload" and "BENCH  Summary")
-          LARGE_JSON_HZ=$(awk '/Large payload - RPC/,/BENCH  Summary/ { if (/· JSON/) { gsub(",", ""); print $3 } }' benchmark-output.txt | head -1)
-          LARGE_MSGPACK_HZ=$(awk '/Large payload - RPC/,/BENCH  Summary/ { if (/· MessagePack/) { gsub(",", ""); print $3 } }' benchmark-output.txt | head -1)
-          LARGE_CBOR_HZ=$(awk '/Large payload - RPC/,/BENCH  Summary/ { if (/· CBOR/) { gsub(",", ""); print $3 } }' benchmark-output.txt | head -1)
+          # Large payload section
+          LARGE_JSON_HZ=$(sed -n '/Large payload - RPC/,/BENCH  Summary/p' benchmark-output.txt | grep -E 'JSON\s+[0-9]' | head -1 | sed 's/,//g' | awk '{for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.[0-9]+$/) {print $i; exit}}')
+          LARGE_MSGPACK_HZ=$(sed -n '/Large payload - RPC/,/BENCH  Summary/p' benchmark-output.txt | grep -E 'MessagePack\s+[0-9]' | head -1 | sed 's/,//g' | awk '{for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.[0-9]+$/) {print $i; exit}}')
+          LARGE_CBOR_HZ=$(sed -n '/Large payload - RPC/,/BENCH  Summary/p' benchmark-output.txt | grep -E 'CBOR\s+[0-9]' | head -1 | sed 's/,//g' | awk '{for(i=1;i<=NF;i++) if($i ~ /^[0-9]+\.[0-9]+$/) {print $i; exit}}')
 
           # Format sizes for display
           format_size() {
