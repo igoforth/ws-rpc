@@ -86,7 +86,7 @@ export interface RpcSchema {
  * @typeParam T - A MethodDef type to extract the input from
  */
 export type InferInput<T> =
-	T extends MethodDef<infer TInput, z.ZodType> ? z.infer<TInput> : never;
+	T extends MethodDef<infer TInput, z.ZodType> ? z.input<TInput> : never;
 
 /**
  * Infer the output type from a method definition
@@ -94,7 +94,7 @@ export type InferInput<T> =
  * @typeParam T - A MethodDef type to extract the output from
  */
 export type InferOutput<T> =
-	T extends MethodDef<z.ZodType, infer TOutput> ? z.infer<TOutput> : never;
+	T extends MethodDef<z.ZodType, infer TOutput> ? z.output<TOutput> : never;
 
 /**
  * Infer the data type from an event definition
@@ -112,7 +112,9 @@ export type InferMethods<T extends RpcSchema> =
 		? {
 				[K in StringKeys<T["methods"]>]: (
 					input: InferInput<T["methods"][K]>,
-				) => Promise<InferOutput<T["methods"][K]>>;
+				) =>
+					| InferOutput<T["methods"][K]>
+					| Promise<InferOutput<T["methods"][K]>>;
 			}
 		: object;
 
