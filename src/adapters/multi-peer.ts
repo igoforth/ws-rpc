@@ -8,8 +8,7 @@
 import { RpcPeer } from "../peers/default.js";
 import type { RpcProtocol } from "../protocol.js";
 import type {
-	EventDef,
-	InferEventData,
+	InferEvents,
 	Provider,
 	RpcSchema,
 	StringKeys,
@@ -277,11 +276,9 @@ export abstract class MultiPeerBase<
 	 * @param data - Event data matching the schema
 	 * @param ids - Optional array of peer IDs to emit to (broadcasts to all if omitted)
 	 */
-	public emit<K extends StringKeys<TLocalSchema["events"]>>(
+	public emit<K extends StringKeys<InferEvents<TLocalSchema["events"]>>>(
 		event: K,
-		data: TLocalSchema["events"] extends Record<string, EventDef>
-			? InferEventData<TLocalSchema["events"][K]>
-			: never,
+		data: InferEvents<TLocalSchema["events"]>[K],
 		ids?: string[],
 	): void {
 		const validPeers = ids

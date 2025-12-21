@@ -7,6 +7,7 @@
 import type { RpcPeer } from "../peers/default.js";
 import type {
 	Driver,
+	EventDef,
 	EventHandler,
 	InferInput,
 	InferOutput,
@@ -116,7 +117,9 @@ export type MultiDriver<TRemoteSchema extends RpcSchema> =
 /**
  * Event emitter type for client callbacks
  */
-export interface IAdapterHooks<TRemoteSchema extends RpcSchema> {
+export interface IAdapterHooks<
+	TRemoteEvents extends Record<string, EventDef> | undefined,
+> {
 	/** Called when WebSocket connection opens */
 	onConnect?(): void;
 
@@ -130,7 +133,7 @@ export interface IAdapterHooks<TRemoteSchema extends RpcSchema> {
 	onReconnectFailed?(): void;
 
 	/** Called when receiving an event from the server */
-	onEvent?: EventHandler<TRemoteSchema["events"]>;
+	onEvent?: EventHandler<TRemoteEvents>;
 }
 
 export interface IMultiAdapterHooks<
@@ -162,12 +165,12 @@ export interface IConnectionAdapter<
 	TLocalSchema extends RpcSchema,
 	TRemoteSchema extends RpcSchema,
 > extends IRpcOptions<TLocalSchema, TRemoteSchema>,
-		IMethodController<TLocalSchema>,
-		IEventController<TLocalSchema, TRemoteSchema> {
+		IMethodController<TLocalSchema["methods"]>,
+		IEventController<TLocalSchema["events"], TRemoteSchema["events"]> {
 	/** Driver for calling remote methods on connected peer */
 	readonly driver: Driver<TRemoteSchema["methods"]>;
 
-	readonly hooks: IAdapterHooks<TRemoteSchema>;
+	readonly hooks: IAdapterHooks<TRemoteSchema["events"]>;
 }
 
 /**
@@ -180,8 +183,12 @@ export interface IMultiConnectionAdapter<
 	TLocalSchema extends RpcSchema,
 	TRemoteSchema extends RpcSchema,
 > extends IRpcOptions<TLocalSchema, TRemoteSchema>,
-		IMethodController<TLocalSchema>,
-		IEventController<TLocalSchema, TRemoteSchema, [ids?: string[]]> {
+		IMethodController<TLocalSchema["methods"]>,
+		IEventController<
+			TLocalSchema["events"],
+			TRemoteSchema["events"],
+			[ids?: string[]]
+		> {
 	/** Driver for calling remote methods on connected peers */
 	readonly driver: MultiDriver<TRemoteSchema>;
 

@@ -59,8 +59,7 @@ import {
 	type DurableRpcPeerOptions,
 } from "../peers/durable.js";
 import type {
-	EventDef,
-	InferEventData,
+	InferEvents,
 	Provider,
 	RpcSchema,
 	StringKeys,
@@ -204,12 +203,10 @@ export interface IRpcActorHooks<
 	onRpcDisconnect(peer: RpcPeer<TLocalSchema, TRemoteSchema>): void;
 
 	/** Called when an event is received from a peer. Override to handle events. */
-	onRpcEvent<K extends StringKeys<TRemoteSchema["events"]>>(
+	onRpcEvent<K extends StringKeys<InferEvents<TRemoteSchema["events"]>>>(
 		peer: RpcPeer<TLocalSchema, TRemoteSchema>,
 		event: K,
-		data: TRemoteSchema["events"] extends Record<string, EventDef>
-			? InferEventData<TRemoteSchema["events"][K]>
-			: never,
+		data: InferEvents<TRemoteSchema["events"]>[K],
 	): void;
 
 	/** Called when a peer encounters an error. Override to handle errors. */
@@ -343,12 +340,12 @@ export function withRpc<
 		): void {}
 
 		/** Called when an event is received from a peer. Override to handle events. */
-		protected onRpcEvent<K extends StringKeys<TRemoteSchema["events"]>>(
+		protected onRpcEvent<
+			K extends StringKeys<InferEvents<TRemoteSchema["events"]>>,
+		>(
 			_peer: RpcPeer<TLocalSchema, TRemoteSchema>,
 			_event: K,
-			_data: TRemoteSchema["events"] extends Record<string, EventDef>
-				? InferEventData<TRemoteSchema["events"][K]>
-				: never,
+			_data: InferEvents<TRemoteSchema["events"]>[K],
 		): void {}
 
 		/** Called when a peer encounters an error. Override to handle errors. */
@@ -377,11 +374,9 @@ export function withRpc<
 		 * @param data - Event data matching the schema
 		 * @param ids - Optional array of peer IDs to emit to (broadcasts to all if omitted)
 		 */
-		public emit<K extends StringKeys<TLocalSchema["events"]>>(
+		public emit<K extends StringKeys<InferEvents<TLocalSchema["events"]>>>(
 			event: K,
-			data: TLocalSchema["events"] extends Record<string, EventDef>
-				? InferEventData<TLocalSchema["events"][K]>
-				: never,
+			data: InferEvents<TLocalSchema["events"]>[K],
 			ids?: string[],
 		): void {
 			this._rpc.emit(event, data, ids);

@@ -6,7 +6,14 @@
  */
 
 import type { RpcProtocol, WireInput } from "./protocol";
-import type { EventEmitter, EventHandler, Provider, RpcSchema } from "./schema";
+import type {
+	EventDef,
+	EventEmitter,
+	EventHandler,
+	MethodDef,
+	Provider,
+	RpcSchema,
+} from "./schema";
 
 // =============================================================================
 // WebSocket Interfaces (Platform-Agnostic)
@@ -118,9 +125,11 @@ export interface IRpcOptions<
  *
  * @typeParam TLocalSchema - Schema defining local methods
  */
-export interface IMethodController<TLocalSchema extends RpcSchema> {
+export interface IMethodController<
+	TLocalMethods extends Record<string, MethodDef> | undefined,
+> {
 	/** Implementation of local methods */
-	readonly provider: Provider<TLocalSchema["methods"]>;
+	readonly provider: Provider<TLocalMethods>;
 }
 
 /**
@@ -132,16 +141,16 @@ export interface IMethodController<TLocalSchema extends RpcSchema> {
  * @typeParam EventArgs - Additional arguments for event handler
  */
 export interface IEventController<
-	TLocalSchema extends RpcSchema,
-	TRemoteSchema extends RpcSchema,
+	TLocalEvents extends Record<string, EventDef> | undefined,
+	TRemoteEvents extends Record<string, EventDef> | undefined,
 	EmitArgs extends any[] = [],
 	EventArgs extends any[] = [],
 > {
 	/** Emit an event to the connected peer */
-	emit: EventEmitter<TLocalSchema["events"], EmitArgs>;
+	emit: EventEmitter<TLocalEvents, EmitArgs>;
 
 	/** Called when receiving an event from the connected peer */
-	onEvent?: EventHandler<TRemoteSchema["events"], EventArgs>;
+	onEvent?: EventHandler<TRemoteEvents, EventArgs>;
 }
 
 /**
@@ -153,8 +162,8 @@ export interface IRpcConnection<
 	TLocalSchema extends RpcSchema,
 	TRemoteSchema extends RpcSchema,
 > extends IRpcOptions<TLocalSchema, TRemoteSchema>,
-		IMethodController<TLocalSchema>,
-		IEventController<TLocalSchema, TRemoteSchema> {
+		IMethodController<TLocalSchema["methods"]>,
+		IEventController<TLocalSchema["events"], TRemoteSchema["events"]> {
 	/** Timeout for RPC calls in ms */
 	readonly timeout: number;
 

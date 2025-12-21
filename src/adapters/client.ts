@@ -10,8 +10,7 @@ import { RpcPeer } from "../peers/default.js";
 import type { RpcProtocol, WireInput } from "../protocol.js";
 import type {
 	Driver,
-	EventDef,
-	InferEventData,
+	InferEvents,
 	Provider,
 	RpcSchema,
 	StringKeys,
@@ -36,7 +35,7 @@ import {
 export interface RpcClientOptions<
 	TLocalSchema extends RpcSchema,
 	TRemoteSchema extends RpcSchema,
-> extends IAdapterHooks<TRemoteSchema>,
+> extends IAdapterHooks<TRemoteSchema["events"]>,
 		IRpcOptions<TLocalSchema, TRemoteSchema> {
 	/** WebSocket URL to connect to */
 	url: string;
@@ -81,7 +80,7 @@ export class RpcClient<
 	readonly timeout: number;
 	readonly protocol?: RpcProtocol;
 	readonly provider: Provider<TLocalSchema["methods"]>;
-	readonly hooks: IAdapterHooks<TRemoteSchema> = {};
+	readonly hooks: IAdapterHooks<TRemoteSchema["events"]> = {};
 
 	private readonly reconnectOptions: Required<ReconnectOptions> | false;
 	private readonly createWebSocket: () => IWebSocket;
@@ -163,11 +162,9 @@ export class RpcClient<
 	 * @param event - Event name from local schema
 	 * @param data - Event data matching the schema
 	 */
-	emit<K extends StringKeys<TLocalSchema["events"]>>(
+	emit<K extends StringKeys<InferEvents<TLocalSchema["events"]>>>(
 		event: K,
-		data: TLocalSchema["events"] extends Record<string, EventDef>
-			? InferEventData<TLocalSchema["events"][K]>
-			: never,
+		data: InferEvents<TLocalSchema["events"]>[K],
 	): void {
 		if (!this.peer) {
 			console.warn(`Cannot emit event '${String(event)}': not connected`);

@@ -110,7 +110,7 @@ export class TestRpcDO extends withRpc(BaseActor, {
 	onRpcEvent<K extends "clientEvent">(
 		_peer: RpcPeer<TestLocalSchema, TestRemoteSchema>,
 		event: K,
-		data: z.core.output<TestRemoteSchema["events"][K]["data"]>,
+		data: { clientEvent: { info: string } }[K],
 	): void {
 		this.receivedEvents.push({ event, data });
 	}

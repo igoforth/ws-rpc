@@ -25,9 +25,8 @@ import {
 } from "../protocol.js";
 import type {
 	Driver,
-	EventDef,
 	EventHandler,
-	InferEventData,
+	InferEvents,
 	Provider,
 	RpcSchema,
 	StringKeys,
@@ -174,11 +173,9 @@ export class RpcPeer<
 	/**
 	 * Emit an event to the remote peer (fire-and-forget)
 	 */
-	emit<K extends StringKeys<TLocalSchema["events"]>>(
+	emit<K extends StringKeys<InferEvents<TLocalSchema["events"]>>>(
 		event: K,
-		data: TLocalSchema["events"] extends Record<string, EventDef>
-			? InferEventData<TLocalSchema["events"][K]>
-			: never,
+		data: InferEvents<TLocalSchema["events"]>[K],
 	): void {
 		if (this.closed || this.ws.readyState !== 1) {
 			console.warn(`Cannot emit event '${String(event)}': connection closed`);

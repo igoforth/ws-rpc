@@ -24,6 +24,8 @@ export interface MethodDef<
 	output: TOutput;
 }
 
+export type Method = (input: unknown) => unknown | Promise<unknown>;
+
 /**
  * Event definition with data schema
  */
@@ -31,6 +33,8 @@ export interface EventDef<TData extends z.ZodType = z.ZodType> {
 	_type: "event";
 	data: TData;
 }
+
+export type Event = unknown;
 
 /**
  * Define an RPC method with input/output schemas
@@ -80,6 +84,11 @@ export interface RpcSchema {
 	events?: Record<string, EventDef>;
 }
 
+export interface RpcCollection {
+	methods?: Record<string, Method>;
+	events?: Record<string, Event>;
+}
+
 /**
  * Infer the input type from a method definition
  *
@@ -104,18 +113,24 @@ export type InferEventData<T extends EventDef> = z.infer<T["data"]>;
 /**
  * Infer method signatures from a schema's methods
  */
-export type InferMethods<T extends Record<string, MethodDef>> = {
-	[K in StringKeys<T>]: (
-		input: z.input<T[K]["input"]>,
-	) => z.output<T[K]["output"]> | Promise<z.output<T[K]["output"]>>;
-};
+export type InferMethods<T extends RpcSchema["methods"]> =
+	T extends Record<string, MethodDef>
+		? {
+				[K in StringKeys<T>]: (
+					input: z.input<T[K]["input"]>,
+				) => z.output<T[K]["output"]> | Promise<z.output<T[K]["output"]>>;
+			}
+		: Record<string, Method>;
 
 /**
  * Infer event emitter signatures from a schema's events
  */
-export type InferEvents<T extends Record<string, EventDef>> = {
-	[K in StringKeys<T>]: InferEventData<T[K]>;
-};
+export type InferEvents<T extends RpcSchema["events"]> =
+	T extends Record<string, EventDef>
+		? {
+				[K in StringKeys<T>]: z.infer<T[K]["data"]>;
+			}
+		: Record<string, Event>;
 
 /**
  * Provider type - implements the local methods defined in a schema
@@ -132,27 +147,23 @@ export type Driver<T extends RpcSchema["methods"]> =
 /**
  * Event handler type - handles incoming events
  */
-export type EventHandler<
+export interface EventHandler<
 	T extends RpcSchema["events"],
 	ExtraArgs extends any[] = [],
-> = <K extends StringKeys<T>>(
-	...args: [
-		...ExtraArgs,
-		event: K,
-		data: T extends Record<string, EventDef> ? InferEventData<T[K]> : never,
-	]
-) => void;
+> {
+	<K extends StringKeys<InferEvents<T>>>(
+		...args: [...ExtraArgs, event: K, data: InferEvents<T>[K]]
+	): void;
+}
 
 /**
  * Event emitter type - emits outgoing events
  */
-export type EventEmitter<
+export interface EventEmitter<
 	T extends RpcSchema["events"],
 	ExtraArgs extends any[] = [],
-> = <K extends StringKeys<T>>(
-	...args: [
-		event: K,
-		data: T extends Record<string, EventDef> ? InferEventData<T[K]> : never,
-		...ExtraArgs,
-	]
-) => void;
+> {
+	<K extends StringKeys<InferEvents<T>>>(
+		...args: [event: K, data: InferEvents<T>[K], ...ExtraArgs]
+	): void;
+}
