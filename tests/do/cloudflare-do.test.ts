@@ -528,3 +528,168 @@ describe("withRpc Mixin - WebSocket Integration", (it) => {
 		ws2.close(1000, "test complete");
 	});
 });
+
+describe("withRpc Mixin - RPC Lifecycle Hooks", (it) => {
+	it("should call onRpcConnect when peer connects", async ({ expect }) => {
+		const response = await SELF.fetch("http://localhost/ws/test-hook-connect", {
+			headers: { Upgrade: "websocket" },
+		});
+
+		const ws = response.webSocket!;
+		ws.accept();
+
+		const stub = env.TestRpcDO.get(
+			env.TestRpcDO.idFromName("test-hook-connect"),
+		);
+		const connectedIds = await runInDurableObject(stub, (instance) =>
+			instance.getConnectedPeerIds(),
+		);
+
+		expect(connectedIds.length).toBe(1);
+		expect(typeof connectedIds[0]).toBe("string");
+
+		ws.close(1000, "test complete");
+	});
+
+	it("should call onRpcDisconnect when peer disconnects", async ({
+		expect,
+	}) => {
+		const response = await SELF.fetch(
+			"http://localhost/ws/test-hook-disconnect",
+			{
+				headers: { Upgrade: "websocket" },
+			},
+		);
+
+		const ws = response.webSocket!;
+		ws.accept();
+
+		const stub = env.TestRpcDO.get(
+			env.TestRpcDO.idFromName("test-hook-disconnect"),
+		);
+
+		// Verify connected
+		const connectedBefore = await runInDurableObject(stub, (instance) =>
+			instance.getConnectedPeerIds(),
+		);
+		expect(connectedBefore.length).toBe(1);
+
+		// Close WebSocket
+		ws.close(1000, "test complete");
+
+		// Wait for cleanup
+		await new Promise((resolve) => setTimeout(resolve, 50));
+
+		// Verify onRpcDisconnect was called
+		const disconnectedIds = await runInDurableObject(stub, (instance) =>
+			instance.getDisconnectedPeerIds(),
+		);
+
+		expect(disconnectedIds.length).toBe(1);
+		expect(disconnectedIds[0]).toBe(connectedBefore[0]);
+	});
+
+	it("should call onRpcEvent when receiving event from client", async ({
+		expect,
+	}) => {
+		const response = await SELF.fetch("http://localhost/ws/test-hook-event", {
+			headers: { Upgrade: "websocket" },
+		});
+
+		const ws = response.webSocket!;
+		ws.accept();
+
+		// Send an event from client
+		ws.send(
+			JSON.stringify({
+				type: "rpc:event",
+				event: "clientEvent",
+				data: { info: "hello from client" },
+			}),
+		);
+
+		// Wait for event to be processed
+		await new Promise((resolve) => setTimeout(resolve, 50));
+
+		const stub = env.TestRpcDO.get(env.TestRpcDO.idFromName("test-hook-event"));
+		const receivedEvents = await runInDurableObject(stub, (instance) =>
+			instance.getReceivedEvents(),
+		);
+
+		expect(receivedEvents.length).toBe(1);
+		expect(receivedEvents[0]).toEqual({
+			event: "clientEvent",
+			data: { info: "hello from client" },
+		});
+
+		ws.close(1000, "test complete");
+	});
+
+	it("should track multiple peer connections via hooks", async ({ expect }) => {
+		// Connect first client
+		const response1 = await SELF.fetch(
+			"http://localhost/ws/test-hook-multi-connect",
+			{
+				headers: { Upgrade: "websocket" },
+			},
+		);
+		const ws1 = response1.webSocket!;
+		ws1.accept();
+
+		// Connect second client
+		const response2 = await SELF.fetch(
+			"http://localhost/ws/test-hook-multi-connect",
+			{
+				headers: { Upgrade: "websocket" },
+			},
+		);
+		const ws2 = response2.webSocket!;
+		ws2.accept();
+
+		const stub = env.TestRpcDO.get(
+			env.TestRpcDO.idFromName("test-hook-multi-connect"),
+		);
+		const connectedIds = await runInDurableObject(stub, (instance) =>
+			instance.getConnectedPeerIds(),
+		);
+
+		expect(connectedIds.length).toBe(2);
+		// Each peer should have a unique ID
+		expect(connectedIds[0]).not.toBe(connectedIds[1]);
+
+		ws1.close(1000, "test complete");
+		ws2.close(1000, "test complete");
+	});
+
+	it("should call hooks in correct order: connect then disconnect", async ({
+		expect,
+	}) => {
+		const response = await SELF.fetch("http://localhost/ws/test-hook-order", {
+			headers: { Upgrade: "websocket" },
+		});
+
+		const ws = response.webSocket!;
+		ws.accept();
+
+		const stub = env.TestRpcDO.get(env.TestRpcDO.idFromName("test-hook-order"));
+
+		// Get connected peer ID
+		const connectedIds = await runInDurableObject(stub, (instance) =>
+			instance.getConnectedPeerIds(),
+		);
+		expect(connectedIds.length).toBe(1);
+		const peerId = connectedIds[0];
+
+		// Close and wait
+		ws.close(1000, "test complete");
+		await new Promise((resolve) => setTimeout(resolve, 50));
+
+		// Verify disconnect was called with same peer ID
+		const disconnectedIds = await runInDurableObject(stub, (instance) =>
+			instance.getDisconnectedPeerIds(),
+		);
+
+		expect(disconnectedIds.length).toBe(1);
+		expect(disconnectedIds[0]).toBe(peerId);
+	});
+});

@@ -9,7 +9,7 @@ import { Actor } from "@cloudflare/actors";
 import * as z from "zod";
 import { withRpc } from "../../src/adapters/cloudflare-do.js";
 import type { RpcPeer } from "../../src/peers/default.js";
-import { event, method } from "../../src/schema.js";
+import { event, type InferEventData, method } from "../../src/schema.js";
 
 // Test schemas
 export const TestLocalSchema = {
@@ -77,7 +77,11 @@ export class TestRpcDO extends withRpc(BaseActor, {
 	remoteSchema: TestRemoteSchema,
 	timeout: 5000,
 }) {
+	// Hook tracking
+	private connectedPeerIds: string[] = [];
+	private disconnectedPeerIds: string[] = [];
 	private receivedEvents: Array<{ event: string; data: unknown }> = [];
+	private receivedErrors: Array<{ peerId: string | null; error: string }> = [];
 	private hibernationRecoveryCount = 0;
 
 	override async increment(input: {
@@ -89,17 +93,39 @@ export class TestRpcDO extends withRpc(BaseActor, {
 		return result;
 	}
 
+	// Hook for tracking peer connections (for testing)
+	override onRpcConnect(
+		peer: RpcPeer<typeof TestLocalSchema, typeof TestRemoteSchema>,
+	): void {
+		this.connectedPeerIds.push(peer.id);
+	}
+
+	// Hook for tracking peer disconnections (for testing)
+	override onRpcDisconnect(
+		peer: RpcPeer<typeof TestLocalSchema, typeof TestRemoteSchema>,
+	): void {
+		this.disconnectedPeerIds.push(peer.id);
+	}
+
 	// Hook for tracking received events (for testing)
-	protected onRpcEvent(
-		_peer: RpcPeer<TestLocalSchema, TestRemoteSchema>,
-		event: string,
-		data: unknown,
+	override onRpcEvent<K extends "clientEvent">(
+		_peer: RpcPeer<typeof TestLocalSchema, typeof TestRemoteSchema>,
+		event: K,
+		data: InferEventData<(typeof TestRemoteSchema)["events"][K]>,
 	): void {
 		this.receivedEvents.push({ event, data });
 	}
 
+	// Hook for tracking errors (for testing)
+	override onRpcError(
+		peer: RpcPeer<typeof TestLocalSchema, typeof TestRemoteSchema> | null,
+		error: Error,
+	): void {
+		this.receivedErrors.push({ peerId: peer?.id ?? null, error: error.message });
+	}
+
 	// Hook for tracking hibernation recovery (for testing)
-	protected onRpcPeerRecreated(
+	override onRpcPeerRecreated(
 		_peer: RpcPeer<TestLocalSchema, TestRemoteSchema>,
 		_ws: WebSocket,
 	): void {
@@ -117,8 +143,20 @@ export class TestRpcDO extends withRpc(BaseActor, {
 	}
 
 	// Test helper methods
+	getConnectedPeerIds(): string[] {
+		return this.connectedPeerIds;
+	}
+
+	getDisconnectedPeerIds(): string[] {
+		return this.disconnectedPeerIds;
+	}
+
 	getReceivedEvents(): Array<{ event: string; data: unknown }> {
 		return this.receivedEvents;
+	}
+
+	getReceivedErrors(): Array<{ peerId: string | null; error: string }> {
+		return this.receivedErrors;
 	}
 
 	clearReceivedEvents(): void {

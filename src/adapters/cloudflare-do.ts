@@ -125,6 +125,7 @@ class DOMultiPeer<
 			localSchema: this.localSchema,
 			remoteSchema: this.remoteSchema,
 			provider,
+			...(this.protocol !== undefined && { protocol: this.protocol }),
 			onEvent: (event, data) => {
 				this.hooks.onEvent?.(peer, event, data);
 			},
@@ -189,6 +190,42 @@ class DOMultiPeer<
 }
 
 /**
+ * Interface for overridable RPC hooks exposed by the mixin.
+ * Subclasses can override these to handle RPC lifecycle events.
+ */
+export interface IRpcActorHooks<
+	TLocalSchema extends RpcSchema,
+	TRemoteSchema extends RpcSchema,
+> {
+	/** Called when a peer connects. Override to handle connection events. */
+	onRpcConnect(peer: RpcPeer<TLocalSchema, TRemoteSchema>): void;
+
+	/** Called when a peer disconnects. Override to handle disconnection events. */
+	onRpcDisconnect(peer: RpcPeer<TLocalSchema, TRemoteSchema>): void;
+
+	/** Called when an event is received from a peer. Override to handle events. */
+	onRpcEvent<K extends StringKeys<TRemoteSchema["events"]>>(
+		peer: RpcPeer<TLocalSchema, TRemoteSchema>,
+		event: K,
+		data: TRemoteSchema["events"] extends Record<string, EventDef>
+			? InferEventData<TRemoteSchema["events"][K]>
+			: never,
+	): void;
+
+	/** Called when a peer encounters an error. Override to handle errors. */
+	onRpcError(
+		peer: RpcPeer<TLocalSchema, TRemoteSchema> | null,
+		error: Error,
+	): void;
+
+	/** Called when a peer is recreated after hibernation. Override to handle recovery. */
+	onRpcPeerRecreated(
+		peer: RpcPeer<TLocalSchema, TRemoteSchema>,
+		ws: WebSocket,
+	): void;
+}
+
+/**
  * Constructor type for the RPC mixin result.
  *
  * Subclasses must implement methods from TLocalSchema on `this`.
@@ -201,7 +238,9 @@ export type RpcActorConstructor<
 > = {
 	new (
 		...args: ConstructorParameters<TBase>
-	): InstanceType<TBase> & IMultiConnectionAdapter<TLocalSchema, TRemoteSchema>;
+	): InstanceType<TBase> &
+		IMultiConnectionAdapter<TLocalSchema, TRemoteSchema> &
+		IRpcActorHooks<TLocalSchema, TRemoteSchema>;
 } & Omit<TBase, "new">;
 
 /**
@@ -270,7 +309,7 @@ export function withRpc<
 		 *
 		 * @throws Error if DurableObjectStorage is not available
 		 */
-		get _rpc() {
+		private get _rpc() {
 			if (!this.storage.raw)
 				throw new Error("DurableObjectStorage not present in actor `raw`");
 			return (this.__rpc ??= new DOMultiPeer({
@@ -280,13 +319,54 @@ export function withRpc<
 				remoteSchema: options.remoteSchema,
 				provider: this as Provider<TLocalSchema>,
 				...(options.timeout !== undefined && { timeout: options.timeout }),
+				...(options.protocol !== undefined && { protocol: options.protocol }),
+				hooks: {
+					onConnect: (peer) => this.onRpcConnect(peer),
+					onDisconnect: (peer) => this.onRpcDisconnect(peer),
+					onEvent: (peer, event, data) => this.onRpcEvent(peer, event, data),
+					onError: (peer, error) => this.onRpcError(peer, error),
+					onPeerRecreated: (peer, ws) => this.onRpcPeerRecreated(peer, ws),
+				},
 			}));
 		}
+
+		// =========================================================================
+		// Overridable RPC Hooks
+		// =========================================================================
+
+		/** Called when a peer connects. Override to handle connection events. */
+		protected onRpcConnect(_peer: RpcPeer<TLocalSchema, TRemoteSchema>): void {}
+
+		/** Called when a peer disconnects. Override to handle disconnection events. */
+		protected onRpcDisconnect(
+			_peer: RpcPeer<TLocalSchema, TRemoteSchema>,
+		): void {}
+
+		/** Called when an event is received from a peer. Override to handle events. */
+		protected onRpcEvent<K extends StringKeys<TRemoteSchema["events"]>>(
+			_peer: RpcPeer<TLocalSchema, TRemoteSchema>,
+			_event: K,
+			_data: TRemoteSchema["events"] extends Record<string, EventDef>
+				? InferEventData<TRemoteSchema["events"][K]>
+				: never,
+		): void {}
+
+		/** Called when a peer encounters an error. Override to handle errors. */
+		protected onRpcError(
+			_peer: RpcPeer<TLocalSchema, TRemoteSchema> | null,
+			_error: Error,
+		): void {}
+
+		/** Called when a peer is recreated after hibernation. Override to handle recovery. */
+		protected onRpcPeerRecreated(
+			_peer: RpcPeer<TLocalSchema, TRemoteSchema>,
+			_ws: WebSocket,
+		): void {}
 
 		/**
 		 * Driver for calling methods on connected clients
 		 */
-		get driver() {
+		public get driver() {
 			return this._rpc.driver;
 		}
 
