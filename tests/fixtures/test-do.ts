@@ -9,7 +9,13 @@ import { Actor } from "@cloudflare/actors";
 import * as z from "zod";
 import { withRpc } from "../../src/adapters/cloudflare-do.js";
 import type { RpcPeer } from "../../src/peers/default.js";
-import { event, method, type RpcSchema } from "../../src/schema.js";
+import {
+	type EventDef,
+	event,
+	type MethodDef,
+	method,
+	type RpcSchema,
+} from "../../src/schema.js";
 
 // Test schemas
 export const TestLocalSchema = {
@@ -44,6 +50,9 @@ export const TestRemoteSchema = {
 	events: {
 		clientEvent: event({
 			data: z.object({ info: z.string() }),
+		}),
+		clientEvent2: event({
+			data: z.object({ info2: z.string() }),
 		}),
 	},
 } as const satisfies RpcSchema;
@@ -107,10 +116,48 @@ export class TestRpcDO extends withRpc(BaseActor, {
 		this.disconnectedPeerIds.push(peer.id);
 	}
 
-	onRpcEvent<K extends "clientEvent">(
-		_peer: RpcPeer<TestLocalSchema, TestRemoteSchema>,
+	onRpcEvent<K extends "clientEvent" | "clientEvent2">(
+		_peer: RpcPeer<
+			{
+				readonly methods: {
+					readonly echo: MethodDef<
+						z.ZodObject<{ message: z.ZodString }, z.core.$strip>,
+						z.ZodObject<{ echoed: z.ZodString }, z.core.$strip>
+					>;
+					readonly getState: MethodDef<
+						z.ZodObject<{}, z.core.$strip>,
+						z.ZodObject<{ counter: z.ZodNumber }, z.core.$strip>
+					>;
+					readonly increment: MethodDef<
+						z.ZodObject<{ by: z.ZodNumber }, z.core.$strip>,
+						z.ZodObject<{ counter: z.ZodNumber }, z.core.$strip>
+					>;
+				};
+				readonly events: {
+					readonly stateChanged: EventDef<
+						z.ZodObject<{ counter: z.ZodNumber }, z.core.$strip>
+					>;
+				};
+			},
+			{
+				readonly methods: {
+					readonly ping: MethodDef<
+						z.ZodObject<{}, z.core.$strip>,
+						z.ZodObject<{ pong: z.ZodBoolean }, z.core.$strip>
+					>;
+				};
+				readonly events: {
+					readonly clientEvent: EventDef<
+						z.ZodObject<{ info: z.ZodString }, z.core.$strip>
+					>;
+					readonly clientEvent2: EventDef<
+						z.ZodObject<{ info2: z.ZodString }, z.core.$strip>
+					>;
+				};
+			}
+		>,
 		event: K,
-		data: { clientEvent: { info: string } }[K],
+		data: { clientEvent: { info: string }; clientEvent2: { info2: string } }[K],
 	): void {
 		this.receivedEvents.push({ event, data });
 	}

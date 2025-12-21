@@ -26,10 +26,9 @@ import {
 import type {
 	Driver,
 	EventHandler,
-	InferEvents,
+	EventTuple,
 	Provider,
 	RpcSchema,
-	StringKeys,
 } from "../schema.js";
 import type { IMinWebSocket, IRpcOptions } from "../types.js";
 
@@ -173,16 +172,13 @@ export class RpcPeer<
 	/**
 	 * Emit an event to the remote peer (fire-and-forget)
 	 */
-	emit<K extends StringKeys<InferEvents<TLocalSchema["events"]>>>(
-		event: K,
-		data: InferEvents<TLocalSchema["events"]>[K],
-	): void {
+	emit(...[event, data]: EventTuple<TLocalSchema["events"]>): void {
 		if (this.closed || this.ws.readyState !== 1) {
 			console.warn(`Cannot emit event '${String(event)}': connection closed`);
 			return;
 		}
 
-		const eventName = event;
+		const eventName = event as string;
 		const eventDef = this.localSchema.events?.[eventName];
 		if (!eventDef) {
 			console.warn(`Unknown event '${eventName}'`);

@@ -122,8 +122,8 @@ export class RpcServer<
 			provider: this.provider,
 			...(this.protocol !== undefined && { protocol: this.protocol }),
 			timeout: this.timeout,
-			onEvent: (event, data) => {
-				this.hooks.onEvent?.(peer, event, data);
+			onEvent: (...args) => {
+				this.hooks.onEvent?.(peer, ...args);
 			},
 		});
 

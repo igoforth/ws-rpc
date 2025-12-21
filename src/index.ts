@@ -59,6 +59,7 @@ export {
 	type Driver,
 	type EventDef,
 	type EventHandler,
+	type EventTuple,
 	event,
 	type InferEventData,
 	type InferEvents,

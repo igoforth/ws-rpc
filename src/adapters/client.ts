@@ -8,13 +8,7 @@
 import type { Constructor } from "type-fest";
 import { RpcPeer } from "../peers/default.js";
 import type { RpcProtocol, WireInput } from "../protocol.js";
-import type {
-	Driver,
-	InferEvents,
-	Provider,
-	RpcSchema,
-	StringKeys,
-} from "../schema.js";
+import type { Driver, EventTuple, Provider, RpcSchema } from "../schema.js";
 import {
 	type IRpcOptions,
 	type IWebSocket,
@@ -159,18 +153,14 @@ export class RpcClient<
 	/**
 	 * Emit an event to the server (fire-and-forget)
 	 *
-	 * @param event - Event name from local schema
-	 * @param data - Event data matching the schema
+	 * @param args - Event name and data as tuple
 	 */
-	emit<K extends StringKeys<InferEvents<TLocalSchema["events"]>>>(
-		event: K,
-		data: InferEvents<TLocalSchema["events"]>[K],
-	): void {
+	emit(...args: EventTuple<TLocalSchema["events"]>): void {
 		if (!this.peer) {
-			console.warn(`Cannot emit event '${String(event)}': not connected`);
+			console.warn(`Cannot emit event '${args[0]}': not connected`);
 			return;
 		}
-		this.peer.emit(event, data);
+		this.peer.emit(...args);
 	}
 
 	/**

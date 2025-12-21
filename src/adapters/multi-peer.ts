@@ -7,12 +7,7 @@
 
 import { RpcPeer } from "../peers/default.js";
 import type { RpcProtocol } from "../protocol.js";
-import type {
-	InferEvents,
-	Provider,
-	RpcSchema,
-	StringKeys,
-} from "../schema.js";
+import type { EventTuple, Provider, RpcSchema } from "../schema.js";
 import type { IMinWebSocket } from "../types.js";
 import type {
 	IMultiAdapterHooks,
@@ -112,16 +107,10 @@ export abstract class MultiPeerBase<
 			provider: this.provider,
 			...(this.protocol !== undefined && { protocol: this.protocol }),
 			onEvent: this.hooks.onEvent
-				? (event, data) => {
+				? (...args) => {
 						const peer = this.findPeerByWs(ws);
 						if (peer) {
-							(
-								this.hooks.onEvent as (
-									peer: RpcPeer<TLocalSchema, TRemoteSchema>,
-									event: string,
-									data: unknown,
-								) => void
-							)(peer, event, data);
+							this.hooks.onEvent?.(peer, ...args);
 						}
 					}
 				: undefined,
@@ -272,19 +261,17 @@ export abstract class MultiPeerBase<
 	/**
 	 * Emit an event to connected peers
 	 *
-	 * @param event - Event name from local schema
-	 * @param data - Event data matching the schema
-	 * @param ids - Optional array of peer IDs to emit to (broadcasts to all if omitted)
+	 * @param args - Event tuple followed by optional peer IDs
 	 */
-	public emit<K extends StringKeys<InferEvents<TLocalSchema["events"]>>>(
-		event: K,
-		data: InferEvents<TLocalSchema["events"]>[K],
-		ids?: string[],
+	public emit(
+		...args: [...EventTuple<TLocalSchema["events"]>, ids?: string[] | undefined]
 	): void {
+		const ids = args[2] as string[] | undefined;
+		const eventArgs = args.slice(0, 2) as EventTuple<TLocalSchema["events"]>;
 		const validPeers = ids
 			? this.peers.values().filter((p) => ids.includes(p.id) && p.isOpen)
 			: this.peers.values().filter((p) => p.isOpen);
-		for (const peer of validPeers) peer.emit(event, data);
+		for (const peer of validPeers) peer.emit(...eventArgs);
 	}
 
 	/**

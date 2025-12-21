@@ -58,12 +58,7 @@ import {
 	DurableRpcPeer,
 	type DurableRpcPeerOptions,
 } from "../peers/durable.js";
-import type {
-	InferEvents,
-	Provider,
-	RpcSchema,
-	StringKeys,
-} from "../schema.js";
+import type { EventTuple, Provider, RpcSchema } from "../schema.js";
 import { SqlPendingCallStorage } from "../storage/sql.js";
 import type { IRpcOptions } from "../types.js";
 import { MultiPeerBase, type MultiPeerOptions } from "./multi-peer.js";
@@ -125,8 +120,11 @@ class DOMultiPeer<
 			remoteSchema: this.remoteSchema,
 			provider,
 			...(this.protocol !== undefined && { protocol: this.protocol }),
-			onEvent: (event, data) => {
-				this.hooks.onEvent?.(peer, event, data);
+			onEvent: (...args) => {
+				this.hooks.onEvent?.(
+					peer,
+					...(args as EventTuple<TRemoteSchema["events"]>),
+				);
 			},
 			timeout: this.timeout,
 		});
@@ -203,10 +201,9 @@ export interface IRpcActorHooks<
 	onRpcDisconnect(peer: RpcPeer<TLocalSchema, TRemoteSchema>): void;
 
 	/** Called when an event is received from a peer. Override to handle events. */
-	onRpcEvent<K extends StringKeys<InferEvents<TRemoteSchema["events"]>>>(
+	onRpcEvent(
 		peer: RpcPeer<TLocalSchema, TRemoteSchema>,
-		event: K,
-		data: InferEvents<TRemoteSchema["events"]>[K],
+		...args: EventTuple<TRemoteSchema["events"]>
 	): void;
 
 	/** Called when a peer encounters an error. Override to handle errors. */
@@ -320,7 +317,7 @@ export function withRpc<
 				hooks: {
 					onConnect: (peer) => this.onRpcConnect(peer),
 					onDisconnect: (peer) => this.onRpcDisconnect(peer),
-					onEvent: (peer, event, data) => this.onRpcEvent(peer, event, data),
+					onEvent: (peer, ...args) => this.onRpcEvent(peer, ...args),
 					onError: (peer, error) => this.onRpcError(peer, error),
 					onPeerRecreated: (peer, ws) => this.onRpcPeerRecreated(peer, ws),
 				},
@@ -340,12 +337,9 @@ export function withRpc<
 		): void {}
 
 		/** Called when an event is received from a peer. Override to handle events. */
-		protected onRpcEvent<
-			K extends StringKeys<InferEvents<TRemoteSchema["events"]>>,
-		>(
+		protected onRpcEvent(
 			_peer: RpcPeer<TLocalSchema, TRemoteSchema>,
-			_event: K,
-			_data: InferEvents<TRemoteSchema["events"]>[K],
+			...[_event, _data]: EventTuple<TRemoteSchema["events"]>
 		): void {}
 
 		/** Called when a peer encounters an error. Override to handle errors. */
@@ -374,12 +368,10 @@ export function withRpc<
 		 * @param data - Event data matching the schema
 		 * @param ids - Optional array of peer IDs to emit to (broadcasts to all if omitted)
 		 */
-		public emit<K extends StringKeys<InferEvents<TLocalSchema["events"]>>>(
-			event: K,
-			data: InferEvents<TLocalSchema["events"]>[K],
-			ids?: string[],
+		public emit(
+			...args: [...EventTuple<TLocalSchema["events"]>, ids?: string[]]
 		): void {
-			this._rpc.emit(event, data, ids);
+			this._rpc.emit(...args);
 		}
 
 		/**

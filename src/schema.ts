@@ -145,25 +145,31 @@ export type Driver<T extends RpcSchema["methods"]> =
 	T extends Record<string, MethodDef> ? InferMethods<T> : {};
 
 /**
- * Event handler type - handles incoming events
+ * Discriminated event tuple union - enables proper narrowing in switch statements.
+ */
+export type EventTuple<T extends RpcSchema["events"]> =
+	T extends Record<string, EventDef>
+		? { [K in keyof T]: [event: K, data: z.infer<T[K]["data"]>] }[keyof T]
+		: [event: string, data: unknown];
+
+/**
+ * Event handler type - handles incoming events.
+ * Uses discriminated tuple union for proper type narrowing in switch statements.
  */
 export interface EventHandler<
 	T extends RpcSchema["events"],
 	ExtraArgs extends any[] = [],
 > {
-	<K extends StringKeys<InferEvents<T>>>(
-		...args: [...ExtraArgs, event: K, data: InferEvents<T>[K]]
-	): void;
+	(...args: [...ExtraArgs, ...EventTuple<T>]): void;
 }
 
 /**
- * Event emitter type - emits outgoing events
+ * Event emitter type - emits outgoing events.
+ * Uses discriminated tuple union for proper type narrowing.
  */
 export interface EventEmitter<
 	T extends RpcSchema["events"],
 	ExtraArgs extends any[] = [],
 > {
-	<K extends StringKeys<InferEvents<T>>>(
-		...args: [event: K, data: InferEvents<T>[K], ...ExtraArgs]
-	): void;
+	(...args: [...EventTuple<T>, ...ExtraArgs]): void;
 }
