@@ -56,9 +56,9 @@ export interface RpcPeerOptions<
 	/** WebSocket instance */
 	ws: IMinWebSocket;
 	/** Implementation of local methods */
-	provider: Partial<Provider<TLocalSchema>>;
+	provider: Partial<Provider<TLocalSchema["methods"]>>;
 	/** Handler for incoming events */
-	onEvent?: EventHandler<TRemoteSchema> | undefined;
+	onEvent?: EventHandler<TRemoteSchema["events"]> | undefined;
 	/** Generate unique request IDs */
 	generateId?: (() => string) | undefined;
 }
@@ -81,7 +81,7 @@ export class RpcPeer<
 	protected readonly protocol: RpcProtocol;
 	private readonly localSchema: TLocalSchema;
 	private readonly remoteSchema: TRemoteSchema;
-	private readonly provider: Partial<Provider<TLocalSchema>>;
+	private readonly provider: Partial<Provider<TLocalSchema["methods"]>>;
 	private readonly onEventHandler?: RpcPeerOptions<
 		TLocalSchema,
 		TRemoteSchema
@@ -93,7 +93,7 @@ export class RpcPeer<
 	private closed = false;
 
 	/** Proxy for calling remote methods */
-	readonly driver: Driver<TRemoteSchema>;
+	readonly driver: Driver<TRemoteSchema["methods"]>;
 
 	constructor(options: RpcPeerOptions<TLocalSchema, TRemoteSchema>) {
 		this.id = options.id ?? uuidv7();
@@ -113,7 +113,7 @@ export class RpcPeer<
 	/**
 	 * Create a proxy that allows calling remote methods
 	 */
-	private createDriver(): Driver<TRemoteSchema> {
+	private createDriver(): Driver<TRemoteSchema["methods"]> {
 		const methods = this.remoteSchema.methods ?? {};
 		const driver: Record<string, (input: unknown) => Promise<unknown>> = {};
 
@@ -122,7 +122,7 @@ export class RpcPeer<
 				this.callMethod(methodName, input);
 		}
 
-		return driver as Driver<TRemoteSchema>;
+		return driver as Driver<TRemoteSchema["methods"]>;
 	}
 
 	/**

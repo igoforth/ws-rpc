@@ -130,7 +130,7 @@ export interface IAdapterHooks<TRemoteSchema extends RpcSchema> {
 	onReconnectFailed?(): void;
 
 	/** Called when receiving an event from the server */
-	onEvent?: EventHandler<TRemoteSchema>;
+	onEvent?: EventHandler<TRemoteSchema["events"]>;
 }
 
 export interface IMultiAdapterHooks<
@@ -145,7 +145,7 @@ export interface IMultiAdapterHooks<
 
 	/** Called when an event is received from a peer */
 	onEvent?: EventHandler<
-		TRemoteSchema,
+		TRemoteSchema["events"],
 		[peer: RpcPeer<TLocalSchema, TRemoteSchema>]
 	>;
 
@@ -165,7 +165,7 @@ export interface IConnectionAdapter<
 		IMethodController<TLocalSchema>,
 		IEventController<TLocalSchema, TRemoteSchema> {
 	/** Driver for calling remote methods on connected peer */
-	readonly driver: Driver<TRemoteSchema>;
+	readonly driver: Driver<TRemoteSchema["methods"]>;
 
 	readonly hooks: IAdapterHooks<TRemoteSchema>;
 }

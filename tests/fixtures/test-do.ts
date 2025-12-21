@@ -9,7 +9,7 @@ import { Actor } from "@cloudflare/actors";
 import * as z from "zod";
 import { withRpc } from "../../src/adapters/cloudflare-do.js";
 import type { RpcPeer } from "../../src/peers/default.js";
-import { event, type InferEventData, method } from "../../src/schema.js";
+import { event, method, type RpcSchema } from "../../src/schema.js";
 
 // Test schemas
 export const TestLocalSchema = {
@@ -32,7 +32,7 @@ export const TestLocalSchema = {
 			data: z.object({ counter: z.number() }),
 		}),
 	},
-} as const;
+} as const satisfies RpcSchema;
 
 export const TestRemoteSchema = {
 	methods: {
@@ -46,7 +46,7 @@ export const TestRemoteSchema = {
 			data: z.object({ info: z.string() }),
 		}),
 	},
-} as const;
+} as const satisfies RpcSchema;
 
 export type TestLocalSchema = typeof TestLocalSchema;
 export type TestRemoteSchema = typeof TestRemoteSchema;
@@ -95,30 +95,29 @@ export class TestRpcDO extends withRpc(BaseActor, {
 
 	// Hook for tracking peer connections (for testing)
 	override onRpcConnect(
-		peer: RpcPeer<typeof TestLocalSchema, typeof TestRemoteSchema>,
+		peer: RpcPeer<TestLocalSchema, TestRemoteSchema>,
 	): void {
 		this.connectedPeerIds.push(peer.id);
 	}
 
 	// Hook for tracking peer disconnections (for testing)
 	override onRpcDisconnect(
-		peer: RpcPeer<typeof TestLocalSchema, typeof TestRemoteSchema>,
+		peer: RpcPeer<TestLocalSchema, TestRemoteSchema>,
 	): void {
 		this.disconnectedPeerIds.push(peer.id);
 	}
 
-	// Hook for tracking received events (for testing)
-	override onRpcEvent<K extends "clientEvent">(
-		_peer: RpcPeer<typeof TestLocalSchema, typeof TestRemoteSchema>,
+	onRpcEvent<K extends "clientEvent">(
+		_peer: RpcPeer<TestLocalSchema, TestRemoteSchema>,
 		event: K,
-		data: InferEventData<(typeof TestRemoteSchema)["events"][K]>,
+		data: z.core.output<TestRemoteSchema["events"][K]["data"]>,
 	): void {
 		this.receivedEvents.push({ event, data });
 	}
 
 	// Hook for tracking errors (for testing)
 	override onRpcError(
-		peer: RpcPeer<typeof TestLocalSchema, typeof TestRemoteSchema> | null,
+		peer: RpcPeer<TestLocalSchema, TestRemoteSchema> | null,
 		error: Error,
 	): void {
 		this.receivedErrors.push({

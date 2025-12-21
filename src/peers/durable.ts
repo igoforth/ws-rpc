@@ -131,7 +131,7 @@ export class DurableRpcPeer<
 		timeout?: number,
 	): void {
 		// Validate callback exists and is a function
-		const callbackFn = this.actor[callback as keyof TActor];
+		const callbackFn = this.actor[callback];
 		if (typeof callbackFn !== "function") {
 			throw new Error(`Callback '${callback}' is not a function on the actor`);
 		}

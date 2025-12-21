@@ -25,7 +25,7 @@ export interface RpcServerOptions<
 	TRemoteSchema extends RpcSchema,
 > extends IRpcOptions<TLocalSchema, TRemoteSchema> {
 	/** Implementation of local methods */
-	provider: Provider<TLocalSchema>;
+	provider: Provider<TLocalSchema["methods"]>;
 	/** WebSocket server instance or options to create one */
 	wss: IWebSocketServer | WebSocketServerOptions;
 	/** WebSocket server constructor (required when passing options instead of server instance) */

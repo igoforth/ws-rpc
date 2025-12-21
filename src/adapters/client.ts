@@ -41,7 +41,7 @@ export interface RpcClientOptions<
 	/** WebSocket URL to connect to */
 	url: string;
 	/** Implementation of local methods */
-	provider: Provider<TLocalSchema>;
+	provider: Provider<TLocalSchema["methods"]>;
 	/** Auto-reconnect options (set to false to disable) */
 	reconnect?: ReconnectOptions | false;
 	/** Automatically connect when client is created (default: false) */
@@ -80,7 +80,7 @@ export class RpcClient<
 	readonly remoteSchema: TRemoteSchema;
 	readonly timeout: number;
 	readonly protocol?: RpcProtocol;
-	readonly provider: Provider<TLocalSchema>;
+	readonly provider: Provider<TLocalSchema["methods"]>;
 	readonly hooks: IAdapterHooks<TRemoteSchema> = {};
 
 	private readonly reconnectOptions: Required<ReconnectOptions> | false;
@@ -150,7 +150,7 @@ export class RpcClient<
 	 * @returns Driver proxy for calling remote methods
 	 * @throws Error if not connected
 	 */
-	get driver(): Driver<TRemoteSchema> {
+	get driver(): Driver<TRemoteSchema["methods"]> {
 		if (!this.peer) {
 			throw new Error("Not connected - call connect() first");
 		}

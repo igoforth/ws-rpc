@@ -118,7 +118,7 @@ class DOMultiPeer<
 	 */
 	public createPeerWithProvider(
 		ws: WebSocket,
-		provider: Provider<TLocalSchema>,
+		provider: Provider<TLocalSchema["methods"]>,
 	): DurableRpcPeer<TLocalSchema, TRemoteSchema, TActor> {
 		const peer = this._createPeer({
 			ws,
@@ -140,7 +140,7 @@ class DOMultiPeer<
 	 */
 	public getOrCreatePeer(
 		ws: WebSocket,
-		provider: Provider<TLocalSchema>,
+		provider: Provider<TLocalSchema["methods"]>,
 		isHibernationRecovery = false,
 	): RpcPeer<TLocalSchema, TRemoteSchema> {
 		let peer = this.getPeerFor(ws);
@@ -162,7 +162,7 @@ class DOMultiPeer<
 	 */
 	public connectPeer(
 		ws: WebSocket,
-		provider: Provider<TLocalSchema>,
+		provider: Provider<TLocalSchema["methods"]>,
 	): RpcPeer<TLocalSchema, TRemoteSchema> {
 		const peer = this.createPeerWithProvider(ws, provider);
 		this.addPeer(ws, peer);
@@ -291,7 +291,7 @@ export function withRpc<
 	TRemoteSchema extends RpcSchema,
 	TEnv,
 	TBase extends Constructor<Actor<TEnv>> & {
-		prototype: Provider<TLocalSchema>;
+		prototype: Provider<TLocalSchema["methods"]>;
 	},
 >(
 	Base: TBase,
@@ -317,7 +317,7 @@ export function withRpc<
 				storage: new SqlPendingCallStorage(this.storage.raw.sql),
 				localSchema: options.localSchema,
 				remoteSchema: options.remoteSchema,
-				provider: this as Provider<TLocalSchema>,
+				provider: this as unknown as Provider<TLocalSchema["methods"]>,
 				...(options.timeout !== undefined && { timeout: options.timeout }),
 				...(options.protocol !== undefined && { protocol: options.protocol }),
 				hooks: {
@@ -407,7 +407,10 @@ export function withRpc<
 
 		/** Called by Actor when WebSocket connects */
 		protected onWebSocketConnect(ws: WebSocket, _request: Request): void {
-			this._rpc.connectPeer(ws, this as Provider<TLocalSchema>);
+			this._rpc.connectPeer(
+				ws,
+				this as unknown as Provider<TLocalSchema["methods"]>,
+			);
 		}
 
 		/** Called by Actor when WebSocket message received (handles hibernation recovery) */
@@ -418,7 +421,7 @@ export function withRpc<
 			const existingPeer = this._rpc.getPeerFor(ws);
 			const peer = this._rpc.getOrCreatePeer(
 				ws,
-				this as Provider<TLocalSchema>,
+				this as unknown as Provider<TLocalSchema["methods"]>,
 				!existingPeer,
 			);
 			peer.handleMessage(message);

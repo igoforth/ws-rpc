@@ -120,7 +120,7 @@ export interface IRpcOptions<
  */
 export interface IMethodController<TLocalSchema extends RpcSchema> {
 	/** Implementation of local methods */
-	readonly provider: Provider<TLocalSchema>;
+	readonly provider: Provider<TLocalSchema["methods"]>;
 }
 
 /**
@@ -138,10 +138,10 @@ export interface IEventController<
 	EventArgs extends any[] = [],
 > {
 	/** Emit an event to the connected peer */
-	emit: EventEmitter<TLocalSchema, EmitArgs>;
+	emit: EventEmitter<TLocalSchema["events"], EmitArgs>;
 
 	/** Called when receiving an event from the connected peer */
-	onEvent?: EventHandler<TRemoteSchema, EventArgs>;
+	onEvent?: EventHandler<TRemoteSchema["events"], EventArgs>;
 }
 
 /**

@@ -35,7 +35,7 @@ export interface MultiPeerOptions<
 	/** Schema defining remote methods we can call */
 	remoteSchema: TRemoteSchema;
 	/** Implementation of local methods */
-	provider: Provider<TLocalSchema>;
+	provider: Provider<TLocalSchema["methods"]>;
 	/** Default timeout for RPC calls in ms */
 	timeout?: number;
 	/** Protocol for encoding/decoding messages */
@@ -75,7 +75,7 @@ export abstract class MultiPeerBase<
 	public readonly remoteSchema: TRemoteSchema;
 
 	/** Implementation of local methods */
-	public readonly provider: Provider<TLocalSchema>;
+	public readonly provider: Provider<TLocalSchema["methods"]>;
 
 	/** Default timeout for RPC calls */
 	public readonly timeout: number;
