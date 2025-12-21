@@ -187,13 +187,10 @@ import { Actor } from "@cloudflare/actors";
 import { withRpc } from "@igoforth/ws-rpc/adapters/cloudflare-do";
 import { ServerSchema, ClientSchema } from "./schemas";
 
-// The mixin adds RPC capabilities to your Actor
-// Your class must implement the methods defined in localSchema
-export class GameRoom extends withRpc(Actor, {
-  localSchema: ServerSchema,
-  remoteSchema: ClientSchema,
-}) {
-  private gameState = { players: [] as string[] };
+// First, create an Actor with the RPC method implementations
+// Methods from localSchema MUST be defined here for type checking
+class GameRoomActor extends Actor<Env> {
+  protected gameState = { players: [] as string[] };
 
   // Implement methods from ServerSchema
   async getUser({ id }: { id: string }) {
@@ -203,10 +200,15 @@ export class GameRoom extends withRpc(Actor, {
   async createOrder({ product, quantity }: { product: string; quantity: number }) {
     return { orderId: crypto.randomUUID() };
   }
+}
 
+// Then apply the RPC mixin to get driver, emit, etc.
+export class GameRoom extends withRpc(GameRoomActor, {
+  localSchema: ServerSchema,
+  remoteSchema: ClientSchema,
+}) {
   // Use this.driver to call methods on connected clients
   async notifyAllPlayers() {
-    // Call ping on all connected clients
     const results = await this.driver.ping({});
     console.log("Ping results:", results);
   }

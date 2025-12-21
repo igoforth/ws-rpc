@@ -41,15 +41,10 @@ jobs:
           # Run benchmarks and capture output
           pnpm bench 2>&1 | tee benchmark-output.txt
 
-          # Extract wire sizes
-          SMALL_JSON=$(grep -oP 'Small:  JSON=\K[0-9]+' benchmark-output.txt || echo "0")
-          SMALL_MSGPACK=$(grep -oP 'MsgPack=\K[0-9]+(?=B.*Small)' benchmark-output.txt || grep -A1 'Small:' benchmark-output.txt | grep -oP 'MsgPack=\K[0-9]+' || echo "0")
-          SMALL_CBOR=$(grep -oP 'CBOR=\K[0-9]+(?=B)' benchmark-output.txt | head -1 || echo "0")
-
-          # Parse from the logSizes output lines
-          SMALL_LINE=$(grep 'Small:' benchmark-output.txt)
-          MEDIUM_LINE=$(grep 'Medium:' benchmark-output.txt)
-          LARGE_LINE=$(grep 'Large:' benchmark-output.txt)
+          # Parse wire sizes from logSizes output lines
+          SMALL_LINE=$(grep 'Small:' benchmark-output.txt | head -1)
+          MEDIUM_LINE=$(grep 'Medium:' benchmark-output.txt | head -1)
+          LARGE_LINE=$(grep 'Large:' benchmark-output.txt | head -1)
 
           # Extract sizes using sed
           SMALL_JSON=$(echo "$SMALL_LINE" | sed -n 's/.*JSON=\([0-9]*\)B.*/\1/p')
@@ -64,21 +59,25 @@ jobs:
           LARGE_MSGPACK=$(echo "$LARGE_LINE" | sed -n 's/.*MsgPack=\([0-9]*\)B.*/\1/p')
           LARGE_CBOR=$(echo "$LARGE_LINE" | sed -n 's/.*CBOR=\([0-9]*\)B.*/\1/p')
 
-          # Extract throughput (hz) from benchmark results - get the hz column for each codec
-          # Small payload section
-          SMALL_JSON_HZ=$(awk '/Small payload/,/Medium payload/ { if (/JSON/) { gsub(",", ""); print $2 } }' benchmark-output.txt | head -1)
-          SMALL_MSGPACK_HZ=$(awk '/Small payload/,/Medium payload/ { if (/MessagePack/) { gsub(",", ""); print $2 } }' benchmark-output.txt | head -1)
-          SMALL_CBOR_HZ=$(awk '/Small payload/,/Medium payload/ { if (/CBOR/) { gsub(",", ""); print $2 } }' benchmark-output.txt | head -1)
+          # Extract throughput (hz) from benchmark results
+          # Lines look like: "   · JSON         2,513.18  0.0453 ..."
+          # Field $3 is the hz value after removing commas
+          # Benchmarks run in order: Small (JSON, MsgPack, CBOR), Medium (...), Large (...)
 
-          # Medium payload section
-          MEDIUM_JSON_HZ=$(awk '/Medium payload/,/Large payload/ { if (/JSON/) { gsub(",", ""); print $2 } }' benchmark-output.txt | head -1)
-          MEDIUM_MSGPACK_HZ=$(awk '/Medium payload/,/Large payload/ { if (/MessagePack/) { gsub(",", ""); print $2 } }' benchmark-output.txt | head -1)
-          MEDIUM_CBOR_HZ=$(awk '/Medium payload/,/Large payload/ { if (/CBOR/) { gsub(",", ""); print $2 } }' benchmark-output.txt | head -1)
+          # Small payload section (between "Small payload" and "Medium payload")
+          SMALL_JSON_HZ=$(awk '/Small payload - RPC/,/Medium payload - RPC/ { if (/· JSON/) { gsub(",", ""); print $3 } }' benchmark-output.txt | head -1)
+          SMALL_MSGPACK_HZ=$(awk '/Small payload - RPC/,/Medium payload - RPC/ { if (/· MessagePack/) { gsub(",", ""); print $3 } }' benchmark-output.txt | head -1)
+          SMALL_CBOR_HZ=$(awk '/Small payload - RPC/,/Medium payload - RPC/ { if (/· CBOR/) { gsub(",", ""); print $3 } }' benchmark-output.txt | head -1)
 
-          # Large payload section
-          LARGE_JSON_HZ=$(awk '/Large payload/,/BENCH  Summary/ { if (/JSON/) { gsub(",", ""); print $2 } }' benchmark-output.txt | head -1)
-          LARGE_MSGPACK_HZ=$(awk '/Large payload/,/BENCH  Summary/ { if (/MessagePack/) { gsub(",", ""); print $2 } }' benchmark-output.txt | head -1)
-          LARGE_CBOR_HZ=$(awk '/Large payload/,/BENCH  Summary/ { if (/CBOR/) { gsub(",", ""); print $2 } }' benchmark-output.txt | head -1)
+          # Medium payload section (between "Medium payload" and "Large payload")
+          MEDIUM_JSON_HZ=$(awk '/Medium payload - RPC/,/Large payload - RPC/ { if (/· JSON/) { gsub(",", ""); print $3 } }' benchmark-output.txt | head -1)
+          MEDIUM_MSGPACK_HZ=$(awk '/Medium payload - RPC/,/Large payload - RPC/ { if (/· MessagePack/) { gsub(",", ""); print $3 } }' benchmark-output.txt | head -1)
+          MEDIUM_CBOR_HZ=$(awk '/Medium payload - RPC/,/Large payload - RPC/ { if (/· CBOR/) { gsub(",", ""); print $3 } }' benchmark-output.txt | head -1)
+
+          # Large payload section (between "Large payload" and "BENCH  Summary")
+          LARGE_JSON_HZ=$(awk '/Large payload - RPC/,/BENCH  Summary/ { if (/· JSON/) { gsub(",", ""); print $3 } }' benchmark-output.txt | head -1)
+          LARGE_MSGPACK_HZ=$(awk '/Large payload - RPC/,/BENCH  Summary/ { if (/· MessagePack/) { gsub(",", ""); print $3 } }' benchmark-output.txt | head -1)
+          LARGE_CBOR_HZ=$(awk '/Large payload - RPC/,/BENCH  Summary/ { if (/· CBOR/) { gsub(",", ""); print $3 } }' benchmark-output.txt | head -1)
 
           # Format sizes for display
           format_size() {

@@ -6,19 +6,25 @@
  *
  * ## Usage
  *
- * The mixin requires that your class implements the methods defined in the
- * local schema. TypeScript will enforce this at compile time.
+ * The mixin requires that the base Actor class implements the methods defined
+ * in the local schema. TypeScript will enforce this at compile time.
  *
  * ```ts
- * class MyDO extends withRpc(Actor, {
- *   localSchema: SignalSchema,
- *   remoteSchema: FilterSchema,
- * }) {
+ * // First, create an Actor with the RPC method implementations
+ * class MyActorBase extends Actor<Env> {
+ *   protected wallets: string[] = [];
+ *
  *   // Required: implement methods from SignalSchema
  *   async getWallets() {
  *     return { wallets: this.wallets };
  *   }
+ * }
  *
+ * // Then apply the RPC mixin
+ * class MyDO extends withRpc(MyActorBase, {
+ *   localSchema: SignalSchema,
+ *   remoteSchema: FilterSchema,
+ * }) {
  *   // Call methods on connected clients via driver
  *   async notifyClients() {
  *     // Call all connected peers
@@ -220,15 +226,20 @@ export type RpcActorConstructor<
  *   events: {},
  * } as const;
  *
- * class MyDO extends withRpc(Actor, {
- *   localSchema: ServerSchema,
- *   remoteSchema: ClientSchema,
- * }) {
- *   // Required: implement methods from ServerSchema
+ * // Define methods on the base Actor class
+ * class MyActorBase extends Actor<Env> {
+ *   protected dataList: string[] = [];
+ *
  *   async getData() {
  *     return { data: this.dataList };
  *   }
+ * }
  *
+ * // Apply the RPC mixin
+ * class MyDO extends withRpc(MyActorBase, {
+ *   localSchema: ServerSchema,
+ *   remoteSchema: ClientSchema,
+ * }) {
  *   // Call methods on connected clients
  *   async notifyClients() {
  *     const results = await this.driver.clientMethod({ info: "update" });
