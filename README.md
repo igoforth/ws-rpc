@@ -396,25 +396,24 @@ class MyDO extends Actor<Env> {
 
 ## Performance
 
-Real WebSocket RPC round-trip benchmarks (localhost, Node.js):
+Real WebSocket RPC round-trip benchmarks (GitHub Actions runner, Node.js 22):
 
 **Wire sizes:**
 | Payload | JSON | MessagePack | CBOR |
 |---------|------|-------------|------|
 | Small | 93 B | 71 B | 112 B |
-| Medium | 3.5 KB | 2.1 KB | 1.4 KB |
-| Large | 24.5 KB | 19.6 KB | 14.1 KB |
+| Medium | 3.4 KB | 2.1 KB | 1.3 KB |
+| Large | 24.4 KB | 19.5 KB | 14.1 KB |
 
 **Throughput (ops/sec):**
-| Payload | JSON | MessagePack | CBOR |
-|---------|------|-------------|------|
-| Small | 1,371 | 2,208 | **2,423** |
-| Medium | 2,218 | 2,221 | **2,249** |
-| Large | 1,334 | 1,245 | **1,562** |
+| Payload | JSON | MessagePack | CBOR | Fastest |
+|---------|------|-------------|------|---------|
+| Small | 0JSON | 0MessagePack | 0CBOR | JSON |
+| Medium | 0JSON | 0MessagePack | 0CBOR | JSON |
+| Large | 0JSON | 0MessagePack | 0CBOR | JSON |
 
-CBOR provides the best balance of speed and wire size for most payloads. MessagePack excels with smaller payloads. JSON is the most portable but largest.
-
-Run benchmarks yourself: `pnpm bench`
+> Benchmarks run automatically via GitHub Actions. Results may vary based on runner load.
+> Run locally with `pnpm bench` for your environment.
 
 ## Multi-Peer Driver Results
 
