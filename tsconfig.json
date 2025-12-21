@@ -1,28 +1,8 @@
 {
-  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "ESNext",
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "lib": ["ESNext"],
-    "jsx": "preserve",
-    "resolveJsonModule": true,
-    "esModuleInterop": true,
-    "verbatimModuleSyntax": true,
-    "allowJs": false,
-    "skipLibCheck": true,
-    "strict": true,
-    "exactOptionalPropertyTypes": true,
-    "noUncheckedIndexedAccess": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "noErrorTruncation": true,
     "rootDir": "src",
-    "outDir": "dist",
-    "sourceMap": true,
-    "inlineSources": true,
-    "sourceRoot": "/"
+    "outDir": "dist"
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*.ts"]
 }
