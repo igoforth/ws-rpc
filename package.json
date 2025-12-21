@@ -1,6 +1,6 @@
 {
   "name": "@igoforth/ws-rpc",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Bidirectional RPC over WebSocket with Zod schema validation, TypeScript inference, and Cloudflare Durable Object support",
   "type": "module",
   "license": "MIT",
