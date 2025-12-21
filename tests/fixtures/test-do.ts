@@ -121,7 +121,10 @@ export class TestRpcDO extends withRpc(BaseActor, {
 		peer: RpcPeer<typeof TestLocalSchema, typeof TestRemoteSchema> | null,
 		error: Error,
 	): void {
-		this.receivedErrors.push({ peerId: peer?.id ?? null, error: error.message });
+		this.receivedErrors.push({
+			peerId: peer?.id ?? null,
+			error: error.message,
+		});
 	}
 
 	// Hook for tracking hibernation recovery (for testing)

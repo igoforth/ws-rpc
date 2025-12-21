@@ -13,7 +13,11 @@ import { RpcServer } from "../src/adapters/server.js";
 import { createCborCodec } from "../src/codecs/cbor.js";
 import { createJsonCodec } from "../src/codecs/json.js";
 import { createMsgpackCodec } from "../src/codecs/msgpack.js";
-import { createProtocol, type RpcProtocol, RpcMessageSchema } from "../src/protocol.js";
+import {
+	createProtocol,
+	RpcMessageSchema,
+	type RpcProtocol,
+} from "../src/protocol.js";
 import { method, type RpcSchema } from "../src/schema.js";
 import type { IWebSocket, IWebSocketServer } from "../src/types.js";
 
@@ -78,7 +82,9 @@ async function createConnection(
 	port: number,
 	protocol: RpcProtocol,
 ): Promise<BenchConnection> {
-	const provider = { echo: async (input: { data: unknown }) => ({ data: input.data }) };
+	const provider = {
+		echo: async (input: { data: unknown }) => ({ data: input.data }),
+	};
 
 	const server = new RpcServer({
 		wss: { port },
