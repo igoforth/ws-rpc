@@ -1,0 +1,5 @@
+onlyBuiltDependencies:
+  - cbor-extract
+  - esbuild
+  - sharp
+  - workerd

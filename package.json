@@ -1,0 +1,163 @@
+{
+  "name": "@igoforth/ws-rpc",
+  "version": "1.0.0",
+  "description": "Bidirectional RPC over WebSocket with Zod schema validation, TypeScript inference, and Cloudflare Durable Object support",
+  "type": "module",
+  "license": "MIT",
+  "author": {
+    "name": "Ian Goforth",
+    "email": "ian.goforth@gmail.com",
+    "url": "https://ian.goforth.systems/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/igoforth/ws-rpc.git"
+  },
+  "bugs": {
+    "url": "https://github.com/igoforth/ws-rpc/issues"
+  },
+  "homepage": "https://github.com/igoforth/ws-rpc#readme",
+  "keywords": [
+    "rpc",
+    "websocket",
+    "bidirectional",
+    "zod",
+    "typescript",
+    "cloudflare",
+    "durable-objects",
+    "workers",
+    "json-rpc",
+    "msgpack",
+    "cbor",
+    "realtime"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "bench": "vitest bench --config vitest.config.bench.ts",
+    "typecheck": "tsc --noEmit",
+    "typegen": "wrangler types",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "prepublishOnly": "pnpm run build"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "LICENSE",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./protocol": {
+      "types": "./dist/protocol.d.ts",
+      "import": "./dist/protocol.js"
+    },
+    "./schema": {
+      "types": "./dist/schema.d.ts",
+      "import": "./dist/schema.js"
+    },
+    "./errors": {
+      "types": "./dist/errors.d.ts",
+      "import": "./dist/errors.js"
+    },
+    "./peer": {
+      "types": "./dist/peers/index.d.ts",
+      "import": "./dist/peers/index.js"
+    },
+    "./adapters": {
+      "types": "./dist/adapters/index.d.ts",
+      "import": "./dist/adapters/index.js"
+    },
+    "./adapters/client": {
+      "types": "./dist/adapters/client.d.ts",
+      "import": "./dist/adapters/client.js"
+    },
+    "./adapters/server": {
+      "types": "./dist/adapters/server.d.ts",
+      "import": "./dist/adapters/server.js"
+    },
+    "./adapters/cloudflare-do": {
+      "types": "./dist/adapters/cloudflare-do.d.ts",
+      "import": "./dist/adapters/cloudflare-do.js"
+    },
+    "./codecs": {
+      "types": "./dist/codecs/index.d.ts",
+      "import": "./dist/codecs/index.js"
+    },
+    "./codecs/json": {
+      "types": "./dist/codecs/json.d.ts",
+      "import": "./dist/codecs/json.js"
+    },
+    "./codecs/msgpack": {
+      "types": "./dist/codecs/msgpack.d.ts",
+      "import": "./dist/codecs/msgpack.js"
+    },
+    "./codecs/cbor": {
+      "types": "./dist/codecs/cbor.d.ts",
+      "import": "./dist/codecs/cbor.js"
+    },
+    "./storage": {
+      "types": "./dist/storage/index.d.ts",
+      "import": "./dist/storage/index.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js"
+    },
+    "./utils": {
+      "types": "./dist/utils/index.d.ts",
+      "import": "./dist/utils/index.js"
+    }
+  },
+  "dependencies": {
+    "type-fest": "^5.3.1",
+    "uuid": "^13.0.0",
+    "zod": "^4.2.0"
+  },
+  "peerDependencies": {
+    "@cloudflare/actors": ">=0.0.1-beta.6",
+    "@msgpack/msgpack": "^3.1.2",
+    "cbor-x": "^1.6.0"
+  },
+  "peerDependenciesMeta": {
+    "@cloudflare/actors": {
+      "optional": true
+    },
+    "@msgpack/msgpack": {
+      "optional": true
+    },
+    "cbor-x": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.10",
+    "@cloudflare/actors": "^0.0.1-beta.6",
+    "@cloudflare/vitest-pool-workers": "^0.11.1",
+    "@msgpack/msgpack": "^3.1.2",
+    "@types/node": "^22.10.2",
+    "@types/ws": "^8.18.1",
+    "cbor-x": "^1.6.0",
+    "tsdown": "^0.18.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "wrangler": "^4.56.0",
+    "ws": "^8.18.3"
+  },
+  "packageManager": "pnpm@10.26.1+sha512.664074abc367d2c9324fdc18037097ce0a8f126034160f709928e9e9f95d98714347044e5c3164d65bd5da6c59c6be362b107546292a8eecb7999196e5ce58fa",
+  "pnpm": {
+    "patchedDependencies": {
+      "cbor-x@1.6.0": "patches/cbor-x@1.6.0.patch"
+    }
+  }
+}

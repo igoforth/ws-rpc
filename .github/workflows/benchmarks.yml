@@ -1,0 +1,187 @@
+name: Benchmarks
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'tests/**/*.bench.ts'
+      - 'vitest.config.bench.ts'
+  schedule:
+    # Run weekly on Sunday at midnight UTC
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.x
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install
+
+      - name: Build
+        run: pnpm build
+
+      - name: Run benchmarks
+        id: bench
+        run: |
+          # Run benchmarks and capture output
+          pnpm bench 2>&1 | tee benchmark-output.txt
+
+          # Extract wire sizes
+          SMALL_JSON=$(grep -oP 'Small:  JSON=\K[0-9]+' benchmark-output.txt || echo "0")
+          SMALL_MSGPACK=$(grep -oP 'MsgPack=\K[0-9]+(?=B.*Small)' benchmark-output.txt || grep -A1 'Small:' benchmark-output.txt | grep -oP 'MsgPack=\K[0-9]+' || echo "0")
+          SMALL_CBOR=$(grep -oP 'CBOR=\K[0-9]+(?=B)' benchmark-output.txt | head -1 || echo "0")
+
+          # Parse from the logSizes output lines
+          SMALL_LINE=$(grep 'Small:' benchmark-output.txt)
+          MEDIUM_LINE=$(grep 'Medium:' benchmark-output.txt)
+          LARGE_LINE=$(grep 'Large:' benchmark-output.txt)
+
+          # Extract sizes using sed
+          SMALL_JSON=$(echo "$SMALL_LINE" | sed -n 's/.*JSON=\([0-9]*\)B.*/\1/p')
+          SMALL_MSGPACK=$(echo "$SMALL_LINE" | sed -n 's/.*MsgPack=\([0-9]*\)B.*/\1/p')
+          SMALL_CBOR=$(echo "$SMALL_LINE" | sed -n 's/.*CBOR=\([0-9]*\)B.*/\1/p')
+
+          MEDIUM_JSON=$(echo "$MEDIUM_LINE" | sed -n 's/.*JSON=\([0-9]*\)B.*/\1/p')
+          MEDIUM_MSGPACK=$(echo "$MEDIUM_LINE" | sed -n 's/.*MsgPack=\([0-9]*\)B.*/\1/p')
+          MEDIUM_CBOR=$(echo "$MEDIUM_LINE" | sed -n 's/.*CBOR=\([0-9]*\)B.*/\1/p')
+
+          LARGE_JSON=$(echo "$LARGE_LINE" | sed -n 's/.*JSON=\([0-9]*\)B.*/\1/p')
+          LARGE_MSGPACK=$(echo "$LARGE_LINE" | sed -n 's/.*MsgPack=\([0-9]*\)B.*/\1/p')
+          LARGE_CBOR=$(echo "$LARGE_LINE" | sed -n 's/.*CBOR=\([0-9]*\)B.*/\1/p')
+
+          # Extract throughput (hz) from benchmark results - get the hz column for each codec
+          # Small payload section
+          SMALL_JSON_HZ=$(awk '/Small payload/,/Medium payload/ { if (/JSON/) { gsub(",", ""); print $2 } }' benchmark-output.txt | head -1)
+          SMALL_MSGPACK_HZ=$(awk '/Small payload/,/Medium payload/ { if (/MessagePack/) { gsub(",", ""); print $2 } }' benchmark-output.txt | head -1)
+          SMALL_CBOR_HZ=$(awk '/Small payload/,/Medium payload/ { if (/CBOR/) { gsub(",", ""); print $2 } }' benchmark-output.txt | head -1)
+
+          # Medium payload section
+          MEDIUM_JSON_HZ=$(awk '/Medium payload/,/Large payload/ { if (/JSON/) { gsub(",", ""); print $2 } }' benchmark-output.txt | head -1)
+          MEDIUM_MSGPACK_HZ=$(awk '/Medium payload/,/Large payload/ { if (/MessagePack/) { gsub(",", ""); print $2 } }' benchmark-output.txt | head -1)
+          MEDIUM_CBOR_HZ=$(awk '/Medium payload/,/Large payload/ { if (/CBOR/) { gsub(",", ""); print $2 } }' benchmark-output.txt | head -1)
+
+          # Large payload section
+          LARGE_JSON_HZ=$(awk '/Large payload/,/BENCH  Summary/ { if (/JSON/) { gsub(",", ""); print $2 } }' benchmark-output.txt | head -1)
+          LARGE_MSGPACK_HZ=$(awk '/Large payload/,/BENCH  Summary/ { if (/MessagePack/) { gsub(",", ""); print $2 } }' benchmark-output.txt | head -1)
+          LARGE_CBOR_HZ=$(awk '/Large payload/,/BENCH  Summary/ { if (/CBOR/) { gsub(",", ""); print $2 } }' benchmark-output.txt | head -1)
+
+          # Format sizes for display
+          format_size() {
+            local bytes=$1
+            if [ "$bytes" -ge 1000 ]; then
+              echo "$(echo "scale=1; $bytes / 1000" | bc) KB"
+            else
+              echo "$bytes B"
+            fi
+          }
+
+          # Format hz for display (add commas)
+          format_hz() {
+            printf "%'.0f" "${1%.*}" 2>/dev/null || echo "$1"
+          }
+
+          # Find the fastest for each payload size
+          find_fastest() {
+            local json=$1 msgpack=$2 cbor=$3
+            local max=$json
+            local fastest="JSON"
+            if (( $(echo "$msgpack > $max" | bc -l) )); then max=$msgpack; fastest="MessagePack"; fi
+            if (( $(echo "$cbor > $max" | bc -l) )); then fastest="CBOR"; fi
+            echo "$fastest"
+          }
+
+          SMALL_FASTEST=$(find_fastest "$SMALL_JSON_HZ" "$SMALL_MSGPACK_HZ" "$SMALL_CBOR_HZ")
+          MEDIUM_FASTEST=$(find_fastest "$MEDIUM_JSON_HZ" "$MEDIUM_MSGPACK_HZ" "$MEDIUM_CBOR_HZ")
+          LARGE_FASTEST=$(find_fastest "$LARGE_JSON_HZ" "$LARGE_MSGPACK_HZ" "$LARGE_CBOR_HZ")
+
+          # Create the new performance section
+          cat > benchmark-section.md << 'SECTION_END'
+          ## Performance
+
+          Real WebSocket RPC round-trip benchmarks (GitHub Actions runner, Node.js 22):
+
+          **Wire sizes:**
+          | Payload | JSON | MessagePack | CBOR |
+          |---------|------|-------------|------|
+          SECTION_END
+
+          echo "| Small | ${SMALL_JSON} B | ${SMALL_MSGPACK} B | ${SMALL_CBOR} B |" >> benchmark-section.md
+          echo "| Medium | $(format_size $MEDIUM_JSON) | $(format_size $MEDIUM_MSGPACK) | $(format_size $MEDIUM_CBOR) |" >> benchmark-section.md
+          echo "| Large | $(format_size $LARGE_JSON) | $(format_size $LARGE_MSGPACK) | $(format_size $LARGE_CBOR) |" >> benchmark-section.md
+
+          cat >> benchmark-section.md << 'SECTION_END'
+
+          **Throughput (ops/sec):**
+          | Payload | JSON | MessagePack | CBOR | Fastest |
+          |---------|------|-------------|------|---------|
+          SECTION_END
+
+          echo "| Small | $(format_hz $SMALL_JSON_HZ) | $(format_hz $SMALL_MSGPACK_HZ) | $(format_hz $SMALL_CBOR_HZ) | $SMALL_FASTEST |" >> benchmark-section.md
+          echo "| Medium | $(format_hz $MEDIUM_JSON_HZ) | $(format_hz $MEDIUM_MSGPACK_HZ) | $(format_hz $MEDIUM_CBOR_HZ) | $MEDIUM_FASTEST |" >> benchmark-section.md
+          echo "| Large | $(format_hz $LARGE_JSON_HZ) | $(format_hz $LARGE_MSGPACK_HZ) | $(format_hz $LARGE_CBOR_HZ) | $LARGE_FASTEST |" >> benchmark-section.md
+
+          cat >> benchmark-section.md << 'SECTION_END'
+
+          > Benchmarks run automatically via GitHub Actions. Results may vary based on runner load.
+          > Run locally with `pnpm bench` for your environment.
+
+          SECTION_END
+
+          echo "Benchmark section generated:"
+          cat benchmark-section.md
+
+      - name: Update README
+        run: |
+          # Use awk to replace the Performance section
+          awk '
+            /^## Performance$/ { skip=1; next }
+            /^## / && skip { skip=0 }
+            !skip { print }
+          ' README.md > README.tmp
+
+          # Find where to insert (before "## Multi-Peer Driver Results")
+          awk '
+            /^## Multi-Peer Driver Results$/ {
+              while ((getline line < "benchmark-section.md") > 0) print line
+            }
+            { print }
+          ' README.tmp > README.md
+
+          rm -f README.tmp benchmark-section.md benchmark-output.txt
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet README.md; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "docs: update benchmark results
+
+          Automated benchmark update from GitHub Actions.
+
+          🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+          git push
