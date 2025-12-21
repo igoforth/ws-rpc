@@ -1,19 +1,21 @@
 /**
  * Wire Protocol End-to-End Benchmarks
  *
- * Measures real WebSocket round-trip performance through RpcPeer
+ * Measures real WebSocket round-trip performance through RpcClient/RpcServer
  * using JSON, MessagePack, and CBOR codecs.
  */
 
 import { afterAll, beforeAll, bench, describe } from "vitest";
 import { WebSocket, WebSocketServer } from "ws";
 import * as z from "zod";
+import { RpcClient } from "../src/adapters/client.js";
+import { RpcServer } from "../src/adapters/server.js";
 import { createCborCodec } from "../src/codecs/cbor.js";
 import { createJsonCodec } from "../src/codecs/json.js";
 import { createMsgpackCodec } from "../src/codecs/msgpack.js";
-import { RpcPeer } from "../src/peers/default.js";
-import { createProtocol, RpcMessageSchema } from "../src/protocol.js";
+import { createProtocol, type RpcProtocol, RpcMessageSchema } from "../src/protocol.js";
 import { method, type RpcSchema } from "../src/schema.js";
+import type { IWebSocket, IWebSocketServer } from "../src/types.js";
 
 // Test schema
 const BenchSchema = {
@@ -67,76 +69,46 @@ const msgpackProtocol = createProtocol(createMsgpackCodec(RpcMessageSchema));
 const cborProtocol = createProtocol(createCborCodec(RpcMessageSchema));
 
 interface BenchConnection {
-	server: WebSocketServer;
-	serverPeer: RpcPeer<typeof BenchSchema, typeof BenchSchema>;
-	clientPeer: RpcPeer<typeof BenchSchema, typeof BenchSchema>;
-	clientWs: WebSocket;
-	close: () => Promise<void>;
+	server: RpcServer<typeof BenchSchema, typeof BenchSchema>;
+	client: RpcClient<typeof BenchSchema, typeof BenchSchema>;
+	close: () => void;
 }
 
 async function createConnection(
 	port: number,
-	protocol: ReturnType<typeof createProtocol>,
+	protocol: RpcProtocol,
 ): Promise<BenchConnection> {
-	return new Promise((resolve, reject) => {
-		const server = new WebSocketServer({ port });
+	const provider = { echo: async (input: { data: unknown }) => ({ data: input.data }) };
 
-		server.on("error", reject);
-
-		server.on("connection", (serverWs) => {
-			// Server peer - echo handler
-			const serverPeer = new RpcPeer({
-				ws: serverWs,
-				localSchema: BenchSchema,
-				remoteSchema: BenchSchema,
-				provider: {
-					echo: async (input) => ({ data: input.data }),
-				},
-				protocol,
-			});
-
-			serverWs.on("message", (data) => {
-				serverPeer.handleMessage(data);
-			});
-
-			// Create client connection
-			const clientWs = new WebSocket(`ws://localhost:${port}`);
-
-			clientWs.on("open", () => {
-				const clientPeer = new RpcPeer({
-					ws: clientWs,
-					localSchema: BenchSchema,
-					remoteSchema: BenchSchema,
-					provider: {
-						echo: async (input) => ({ data: input.data }),
-					},
-					protocol,
-				});
-
-				clientWs.on("message", (data) => {
-					clientPeer.handleMessage(data);
-				});
-
-				resolve({
-					server,
-					serverPeer,
-					clientPeer,
-					clientWs,
-					close: async () => {
-						clientWs.close();
-						server.close();
-						await new Promise((r) => setTimeout(r, 50));
-					},
-				});
-			});
-
-			clientWs.on("error", reject);
-		});
-
-		// Trigger connection by creating a dummy client
-		const trigger = new WebSocket(`ws://localhost:${port}`);
-		trigger.on("open", () => trigger.close());
+	const server = new RpcServer({
+		wss: { port },
+		WebSocketServer: WebSocketServer as unknown as new () => IWebSocketServer,
+		localSchema: BenchSchema,
+		remoteSchema: BenchSchema,
+		provider,
+		protocol,
 	});
+
+	const client = new RpcClient({
+		url: `ws://localhost:${port}`,
+		WebSocket: WebSocket as unknown as new (url: string) => IWebSocket,
+		localSchema: BenchSchema,
+		remoteSchema: BenchSchema,
+		provider,
+		protocol,
+		reconnect: false,
+	});
+
+	await client.connect();
+
+	return {
+		server,
+		client,
+		close: () => {
+			client.disconnect();
+			server.close();
+		},
+	};
 }
 
 // Track connections for cleanup
@@ -204,9 +176,9 @@ beforeAll(async () => {
 	connections.push(jsonConn, msgpackConn, cborConn);
 });
 
-afterAll(async () => {
+afterAll(() => {
 	for (const conn of connections) {
-		await conn.close();
+		conn.close();
 	}
 });
 
@@ -222,7 +194,7 @@ describe("Small payload - RPC roundtrip", () => {
 	bench(
 		"JSON",
 		async () => {
-			await jsonConn.clientPeer.driver.echo({ data: smallPayload });
+			await jsonConn.client.driver.echo({ data: smallPayload });
 		},
 		benchOpts,
 	);
@@ -230,7 +202,7 @@ describe("Small payload - RPC roundtrip", () => {
 	bench(
 		"MessagePack",
 		async () => {
-			await msgpackConn.clientPeer.driver.echo({ data: smallPayload });
+			await msgpackConn.client.driver.echo({ data: smallPayload });
 		},
 		benchOpts,
 	);
@@ -238,7 +210,7 @@ describe("Small payload - RPC roundtrip", () => {
 	bench(
 		"CBOR",
 		async () => {
-			await cborConn.clientPeer.driver.echo({ data: smallPayload });
+			await cborConn.client.driver.echo({ data: smallPayload });
 		},
 		benchOpts,
 	);
@@ -248,7 +220,7 @@ describe("Medium payload - RPC roundtrip", () => {
 	bench(
 		"JSON",
 		async () => {
-			await jsonConn.clientPeer.driver.echo({ data: mediumPayload });
+			await jsonConn.client.driver.echo({ data: mediumPayload });
 		},
 		benchOpts,
 	);
@@ -256,7 +228,7 @@ describe("Medium payload - RPC roundtrip", () => {
 	bench(
 		"MessagePack",
 		async () => {
-			await msgpackConn.clientPeer.driver.echo({ data: mediumPayload });
+			await msgpackConn.client.driver.echo({ data: mediumPayload });
 		},
 		benchOpts,
 	);
@@ -264,7 +236,7 @@ describe("Medium payload - RPC roundtrip", () => {
 	bench(
 		"CBOR",
 		async () => {
-			await cborConn.clientPeer.driver.echo({ data: mediumPayload });
+			await cborConn.client.driver.echo({ data: mediumPayload });
 		},
 		benchOpts,
 	);
@@ -274,7 +246,7 @@ describe("Large payload - RPC roundtrip", () => {
 	bench(
 		"JSON",
 		async () => {
-			await jsonConn.clientPeer.driver.echo({ data: largePayload });
+			await jsonConn.client.driver.echo({ data: largePayload });
 		},
 		benchOpts,
 	);
@@ -282,7 +254,7 @@ describe("Large payload - RPC roundtrip", () => {
 	bench(
 		"MessagePack",
 		async () => {
-			await msgpackConn.clientPeer.driver.echo({ data: largePayload });
+			await msgpackConn.client.driver.echo({ data: largePayload });
 		},
 		benchOpts,
 	);
@@ -290,7 +262,7 @@ describe("Large payload - RPC roundtrip", () => {
 	bench(
 		"CBOR",
 		async () => {
-			await cborConn.clientPeer.driver.echo({ data: largePayload });
+			await cborConn.client.driver.echo({ data: largePayload });
 		},
 		benchOpts,
 	);

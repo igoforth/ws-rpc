@@ -7,7 +7,7 @@
 
 import type { Constructor } from "type-fest";
 import { RpcPeer } from "../peers/default.js";
-import type { WireInput } from "../protocol.js";
+import type { RpcProtocol, WireInput } from "../protocol.js";
 import type {
 	Driver,
 	EventDef,
@@ -78,18 +78,13 @@ export class RpcClient<
 {
 	readonly localSchema: TLocalSchema;
 	readonly remoteSchema: TRemoteSchema;
+	readonly timeout: number;
+	readonly protocol?: RpcProtocol;
 	readonly provider: Provider<TLocalSchema>;
 	readonly hooks: IAdapterHooks<TRemoteSchema> = {};
 
-	private readonly url: string;
 	private readonly reconnectOptions: Required<ReconnectOptions> | false;
-	private readonly defaultTimeout: number;
-	private readonly protocols: string | string[] | undefined;
-	private readonly headers: Record<string, string> | undefined;
-	private readonly WebSocketImpl: new (
-		url: string,
-		options?: string | string[] | WebSocketOptions,
-	) => IWebSocket;
+	private readonly createWebSocket: () => IWebSocket;
 
 	// Connection state
 	private ws: IWebSocket | null = null;
@@ -100,19 +95,30 @@ export class RpcClient<
 	private intentionalClose = false;
 
 	constructor(options: RpcClientOptions<TLocalSchema, TRemoteSchema>) {
-		this.url = options.url;
 		this.localSchema = options.localSchema;
 		this.remoteSchema = options.remoteSchema;
+		this.timeout = options.timeout ?? 30000;
+		if (options.protocol) this.protocol = options.protocol;
+
 		this.provider = options.provider;
 		this.reconnectOptions =
 			options.reconnect === false
 				? false
 				: { ...defaultReconnectOptions, ...options.reconnect };
-		this.defaultTimeout = options.timeout ?? 30000;
-		this.protocols = options.protocols;
-		this.headers = options.headers;
-		this.WebSocketImpl =
+
+		// Create WebSocket factory capturing connection options
+		const url = options.url;
+		const protocols = options.protocols;
+		const headers = options.headers;
+		const WebSocketImpl =
 			options.WebSocket ?? (globalThis.WebSocket as Constructor<IWebSocket>);
+
+		this.createWebSocket = () => {
+			const wsOptions = headers
+				? { headers, ...(protocols && { protocols }) }
+				: protocols;
+			return new WebSocketImpl(url, wsOptions);
+		};
 
 		if (options.onConnect) this.hooks.onConnect = options.onConnect;
 		if (options.onDisconnect) this.hooks.onDisconnect = options.onDisconnect;
@@ -121,9 +127,7 @@ export class RpcClient<
 			this.hooks.onReconnectFailed = options.onReconnectFailed;
 		if (options.onEvent) this.hooks.onEvent = options.onEvent;
 
-		if (options.autoConnect) {
-			void this.connect();
-		}
+		if (options.autoConnect) void this.connect();
 	}
 
 	/**
@@ -188,18 +192,7 @@ export class RpcClient<
 
 		return new Promise<void>((resolve, reject) => {
 			try {
-				// Use options object when headers are present (Bun/Node.js)
-				// Fall back to protocols-only for browser compatibility
-				let wsOptions: WebSocketOptions | string | string[] | undefined;
-				if (this.headers) {
-					wsOptions = { headers: this.headers };
-					if (this.protocols) {
-						wsOptions.protocols = this.protocols;
-					}
-				} else {
-					wsOptions = this.protocols;
-				}
-				this.ws = new this.WebSocketImpl(this.url, wsOptions);
+				this.ws = this.createWebSocket();
 			} catch (error) {
 				this._state = "disconnected";
 				reject(error);
@@ -282,8 +275,9 @@ export class RpcClient<
 			localSchema: this.localSchema,
 			remoteSchema: this.remoteSchema,
 			provider: this.provider,
+			...(this.protocol !== undefined && { protocol: this.protocol }),
 			onEvent: this.hooks.onEvent,
-			timeout: this.defaultTimeout,
+			timeout: this.timeout,
 		});
 
 		// Set up WebSocket event handlers

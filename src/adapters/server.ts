@@ -28,12 +28,30 @@ export interface RpcServerOptions<
 	provider: Provider<TLocalSchema>;
 	/** WebSocket server instance or options to create one */
 	wss: IWebSocketServer | WebSocketServerOptions;
-	/** WebSocket server constructor (defaults to require('ws').WebSocketServer) */
+	/** WebSocket server constructor (required when passing options instead of server instance) */
 	WebSocketServer?: new (
 		options: WebSocketServerOptions,
 	) => IWebSocketServer;
 	/** Lifecycle hooks */
 	hooks?: IMultiAdapterHooks<TLocalSchema, TRemoteSchema>;
+}
+
+/**
+ * Create or return existing WebSocket server
+ */
+function createWebSocketServer(
+	wss: IWebSocketServer | WebSocketServerOptions,
+	WebSocketServer?: new (options: WebSocketServerOptions) => IWebSocketServer,
+): IWebSocketServer {
+	if ("on" in wss && typeof wss.on === "function") {
+		return wss as IWebSocketServer;
+	}
+	if (!WebSocketServer) {
+		throw new Error(
+			"WebSocketServer constructor required when passing options",
+		);
+	}
+	return new WebSocketServer(wss as WebSocketServerOptions);
 }
 
 /**
@@ -82,24 +100,11 @@ export class RpcServer<
 			remoteSchema: options.remoteSchema,
 			provider: options.provider,
 			...(options.timeout !== undefined && { timeout: options.timeout }),
+			...(options.protocol !== undefined && { protocol: options.protocol }),
 			...(options.hooks !== undefined && { hooks: options.hooks }),
 		});
 
-		// Create or use existing WebSocket server
-		if ("on" in options.wss && typeof options.wss.on === "function") {
-			this.wss = options.wss as IWebSocketServer;
-		} else {
-			if (!options.WebSocketServer) {
-				throw new Error(
-					"WebSocketServer constructor required when passing options",
-				);
-			}
-			this.wss = new options.WebSocketServer(
-				options.wss as WebSocketServerOptions,
-			);
-		}
-
-		// Set up server event handlers
+		this.wss = createWebSocketServer(options.wss, options.WebSocketServer);
 		this.wss.on("connection", (ws) => this.handleConnection(ws));
 		this.wss.on("error", (error) => this.hooks.onError?.(null, error));
 		this.wss.on("close", () => this.hooks.onClose?.());
@@ -115,6 +120,7 @@ export class RpcServer<
 			localSchema: this.localSchema,
 			remoteSchema: this.remoteSchema,
 			provider: this.provider,
+			...(this.protocol !== undefined && { protocol: this.protocol }),
 			timeout: this.timeout,
 			onEvent: (event, data) => {
 				this.hooks.onEvent?.(peer, event, data);

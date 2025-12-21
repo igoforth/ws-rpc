@@ -5,7 +5,7 @@
  * and platform-agnostic WebSocket abstractions.
  */
 
-import type { WireInput } from "./protocol";
+import type { RpcProtocol, WireInput } from "./protocol";
 import type { EventEmitter, EventHandler, Provider, RpcSchema } from "./schema";
 
 // =============================================================================
@@ -106,6 +106,11 @@ export interface IRpcOptions<
 	readonly remoteSchema: TRemoteSchema;
 	/** Default timeout for RPC calls in ms */
 	readonly timeout?: number;
+	/**
+	 * Protocol for encoding/decoding messages.
+	 * Defaults to JSON. Use createProtocol() with a binary codec for better performance.
+	 */
+	readonly protocol?: RpcProtocol;
 }
 
 /**

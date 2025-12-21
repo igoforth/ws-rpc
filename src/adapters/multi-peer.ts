@@ -6,6 +6,7 @@
  */
 
 import { RpcPeer } from "../peers/default.js";
+import type { RpcProtocol } from "../protocol.js";
 import type {
 	EventDef,
 	InferEventData,
@@ -37,6 +38,8 @@ export interface MultiPeerOptions<
 	provider: Provider<TLocalSchema>;
 	/** Default timeout for RPC calls in ms */
 	timeout?: number;
+	/** Protocol for encoding/decoding messages */
+	protocol?: RpcProtocol;
 	/** Lifecycle hooks */
 	hooks?: IMultiAdapterHooks<TLocalSchema, TRemoteSchema>;
 }
@@ -77,6 +80,9 @@ export abstract class MultiPeerBase<
 	/** Default timeout for RPC calls */
 	public readonly timeout: number;
 
+	/** Protocol for encoding/decoding messages */
+	public readonly protocol?: RpcProtocol;
+
 	/** Lifecycle hooks */
 	public readonly hooks: IMultiAdapterHooks<TLocalSchema, TRemoteSchema>;
 
@@ -85,6 +91,7 @@ export abstract class MultiPeerBase<
 		this.remoteSchema = options.remoteSchema;
 		this.provider = options.provider;
 		this.timeout = options.timeout ?? 30000;
+		if (options.protocol) this.protocol = options.protocol;
 		this.hooks = options.hooks ?? {};
 	}
 
@@ -104,6 +111,7 @@ export abstract class MultiPeerBase<
 			localSchema: this.localSchema,
 			remoteSchema: this.remoteSchema,
 			provider: this.provider,
+			...(this.protocol !== undefined && { protocol: this.protocol }),
 			onEvent: this.hooks.onEvent
 				? (event, data) => {
 						const peer = this.findPeerByWs(ws);

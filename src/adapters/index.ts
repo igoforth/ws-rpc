@@ -8,6 +8,8 @@ export {
 	type RpcClientOptions,
 } from "./client.js";
 export {
+	type IDOHooks,
+	type IRpcActorHooks,
 	type RpcActorConstructor,
 	withRpc,
 } from "./cloudflare-do.js";
