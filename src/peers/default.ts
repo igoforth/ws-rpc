@@ -57,23 +57,6 @@ export interface RpcPeerOptions<
 	ws: IMinWebSocket;
 	/** Implementation of local methods */
 	provider: Partial<Provider<TLocalSchema>>;
-	/**
-	 * Protocol for encoding/decoding messages
-	 *
-	 * Defaults to JSON. Use createProtocol() with a binary codec for better performance.
-	 *
-	 * @example
-	 * ```ts
-	 * import { createProtocol, RpcMessageSchema } from "@igoforth/ws-rpc/protocol";
-	 * import { createMsgpackCodec } from "@igoforth/ws-rpc/codecs/msgpack";
-	 *
-	 * const peer = new RpcPeer({
-	 *   protocol: createProtocol(createMsgpackCodec(RpcMessageSchema)),
-	 *   // ...
-	 * });
-	 * ```
-	 */
-	protocol?: RpcProtocol | undefined;
 	/** Handler for incoming events */
 	onEvent?: EventHandler<TRemoteSchema> | undefined;
 	/** Generate unique request IDs */
@@ -271,7 +254,7 @@ export class RpcPeer<
 		}
 
 		// Validate input
-		const parseResult = methodDef.input.safeParse(params);
+		const parseResult = await methodDef.input.safeParseAsync(params);
 		if (!parseResult.success) {
 			this.sendError(
 				id,
@@ -300,7 +283,7 @@ export class RpcPeer<
 			const result = await handler.call(this.provider, parseResult.data);
 
 			// Validate output
-			const outputResult = methodDef.output.safeParse(result);
+			const outputResult = await methodDef.output.safeParseAsync(result);
 			if (!outputResult.success) {
 				this.sendError(
 					id,
