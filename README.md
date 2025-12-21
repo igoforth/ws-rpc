@@ -185,6 +185,7 @@ process.on("SIGTERM", () => server.close());
 ```typescript
 import { Actor } from "@cloudflare/actors";
 import { withRpc } from "@igoforth/ws-rpc/adapters/cloudflare-do";
+import { RpcPeer } from "@igoforth/ws-rpc/peers";
 import { ServerSchema, ClientSchema } from "./schemas";
 
 // First, create an Actor with the RPC method implementations
@@ -222,136 +223,30 @@ export class GameRoom extends withRpc(GameRoomActor, {
   getPlayerCount() {
     return this.getConnectionCount();
   }
-}
-```
 
-## API Reference
+  // Override RPC lifecycle hooks
+  protected override onRpcConnect(peer: RpcPeer<typeof ServerSchema, typeof ClientSchema>) {
+    console.log(`Player ${peer.id} joined`);
+  }
 
-### Schema Definition
+  protected override onRpcDisconnect(peer: RpcPeer<typeof ServerSchema, typeof ClientSchema>) {
+    console.log(`Player ${peer.id} left`);
+  }
 
-```typescript
-import { method, event } from "@igoforth/ws-rpc/schema";
-import { z } from "zod";
+  protected override onRpcError(
+    peer: RpcPeer<typeof ServerSchema, typeof ClientSchema> | null,
+    error: Error,
+  ) {
+    console.error(`Error from ${peer?.id}:`, error);
+  }
 
-// Define a method with input/output validation
-const myMethod = method({
-  input: z.object({ /* ... */ }),
-  output: z.object({ /* ... */ }),
-});
-
-// Define an event (fire-and-forget)
-const myEvent = event({
-  data: z.object({ /* ... */ }),
-});
-
-// Combine into a schema
-const MySchema = {
-  methods: { myMethod },
-  events: { myEvent },
-} satisfies RpcSchema;
-```
-
-### Type Inference
-
-```typescript
-import type { Provider, Driver, InferInput, InferOutput } from "@igoforth/ws-rpc/schema";
-
-// Get the provider type (what you implement)
-type MyProvider = Provider<typeof MySchema>;
-
-// Get the driver type (what you call)
-type MyDriver = Driver<typeof MySchema>;
-
-// Get input/output types for a specific method
-type MyMethodInput = InferInput<typeof MySchema["methods"]["myMethod"]>;
-type MyMethodOutput = InferOutput<typeof MySchema["methods"]["myMethod"]>;
-```
-
-### Codecs
-
-```typescript
-import { createMsgpackCodec } from "@igoforth/ws-rpc/codecs/msgpack";
-import { createCborCodec } from "@igoforth/ws-rpc/codecs/cbor";
-import { createJsonCodec } from "@igoforth/ws-rpc/codecs/json";
-
-// JSON (default)
-const jsonCodec = createJsonCodec(z.unknown());
-
-// MessagePack (requires @msgpack/msgpack)
-const msgpackCodec = createMsgpackCodec(z.unknown());
-
-// CBOR (requires cbor-x)
-const cborCodec = createCborCodec(z.unknown());
-```
-
-### Error Handling
-
-```typescript
-import {
-  RpcError,
-  RpcTimeoutError,
-  RpcRemoteError,
-  RpcConnectionClosed,
-  RpcValidationError,
-  RpcMethodNotFoundError,
-} from "@igoforth/ws-rpc/errors";
-
-try {
-  await client.driver.someMethod({ /* ... */ });
-} catch (error) {
-  if (error instanceof RpcTimeoutError) {
-    console.log(`Request '${error.method}' timed out after ${error.timeoutMs}ms`);
-  } else if (error instanceof RpcValidationError) {
-    console.log("Invalid input/output:", error.message);
-  } else if (error instanceof RpcRemoteError) {
-    console.log("Server error:", error.message, error.code);
-  } else if (error instanceof RpcMethodNotFoundError) {
-    console.log(`Method '${error.method}' not found`);
-  } else if (error instanceof RpcConnectionClosed) {
-    console.log("Connection closed");
+  protected override onRpcPeerRecreated(
+    peer: RpcPeer<typeof ServerSchema, typeof ClientSchema>,
+    ws: WebSocket,
+  ) {
+    console.log(`Player ${peer.id} recovered from hibernation`);
   }
 }
-```
-
-### Client Options
-
-```typescript
-const client = new RpcClient({
-  url: "wss://...",
-  localSchema: MyLocalSchema,
-  remoteSchema: MyRemoteSchema,
-  provider: { /* method implementations */ },
-
-  // Reconnection options (set to false to disable)
-  reconnect: {
-    initialDelay: 1000,    // First retry delay (ms)
-    maxDelay: 30000,       // Maximum retry delay (ms)
-    backoffMultiplier: 2,  // Exponential backoff multiplier
-    maxAttempts: 0,        // Max attempts (0 = unlimited)
-    jitter: 0.1,           // Random jitter factor (0-1)
-  },
-
-  // Request timeout (ms)
-  timeout: 30000,
-
-  // Auto-connect on creation (default: false)
-  autoConnect: true,
-
-  // WebSocket options
-  protocols: ["v1"],                    // Subprotocols
-  headers: { Authorization: "Bearer ..." }, // Headers (Node.js/Bun only)
-
-  // Event handlers
-  onConnect: () => console.log("Connected"),
-  onDisconnect: (code, reason) => console.log("Disconnected"),
-  onReconnect: (attempt, delay) => console.log(`Reconnecting in ${delay}ms`),
-  onReconnectFailed: () => console.log("Reconnection failed"),
-  onEvent: (event, data) => console.log("Event:", event, data),
-});
-
-// Connection state
-client.state;       // "disconnected" | "connecting" | "connected" | "reconnecting"
-client.isConnected; // boolean
 ```
 
 ## Hibernation-Safe Durable Objects
