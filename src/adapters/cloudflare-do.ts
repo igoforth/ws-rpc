@@ -59,6 +59,8 @@ import {
 	type DurableRpcPeerOptions,
 } from "../peers/durable.js";
 import type { EventTuple, Provider, RpcSchema } from "../schema.js";
+import type { SyncPendingCallStorage } from "../storage/interface.js";
+import { MemoryPendingCallStorage } from "../storage/memory.js";
 import { SqlPendingCallStorage } from "../storage/sql.js";
 import type { IRpcOptions } from "../types.js";
 import { MultiPeerBase, type MultiPeerOptions } from "./multi-peer.js";
@@ -300,15 +302,25 @@ export function withRpc<
 		 *
 		 * Handles peer management, message routing, and durable storage.
 		 * Uses SQL storage from the Durable Object for hibernation-safe calls.
-		 *
-		 * @throws Error if DurableObjectStorage is not available
+		 * Falls back to in-memory storage if DurableObjectStorage is not available.
 		 */
 		private get _rpc() {
-			if (!this.storage.raw)
-				throw new Error("DurableObjectStorage not present in actor `raw`");
-			return (this.__rpc ??= new DOMultiPeer({
+			if (this.__rpc) return this.__rpc;
+
+			let storage: SyncPendingCallStorage;
+			if (this.storage?.raw) {
+				storage = new SqlPendingCallStorage(this.storage.raw.sql);
+			} else {
+				console.warn(
+					`[ws-rpc] DurableObjectStorage not available (storage=${typeof this.storage}, this=${this?.constructor?.name ?? typeof this}). ` +
+						`Falling back to in-memory storage. Pending calls will not survive hibernation.`,
+				);
+				storage = new MemoryPendingCallStorage();
+			}
+
+			return (this.__rpc = new DOMultiPeer({
 				actor: this,
-				storage: new SqlPendingCallStorage(this.storage.raw.sql),
+				storage,
 				localSchema: options.localSchema,
 				remoteSchema: options.remoteSchema,
 				provider: this as unknown as Provider<TLocalSchema["methods"]>,
