@@ -6,6 +6,7 @@
  */
 
 import { v7 as uuidv7 } from "uuid";
+import type * as z from "zod";
 import {
 	RpcConnectionClosed,
 	RpcMethodNotFoundError,
@@ -116,7 +117,7 @@ export class RpcPeer<
 		const driver: Record<string, (input: unknown) => Promise<unknown>> = {};
 
 		for (const methodName of Object.keys(methods)) {
-			driver[methodName] = (input: unknown) =>
+			driver[methodName] = (input?: unknown) =>
 				this.callMethod(methodName, input);
 		}
 
@@ -128,7 +129,7 @@ export class RpcPeer<
 	 */
 	private async callMethod(
 		method: string,
-		input: unknown,
+		input?: unknown,
 		timeout?: number,
 	): Promise<unknown> {
 		if (this.closed || this.ws.readyState !== 1) {
@@ -141,7 +142,11 @@ export class RpcPeer<
 		}
 
 		// Validate input against schema
-		const parseResult = methodDef.input.safeParse(input);
+		let parseResult: z.ZodSafeParseResult<unknown> = {
+			success: true,
+			data: undefined,
+		};
+		if (methodDef.input) parseResult = methodDef.input.safeParse(input);
 		if (!parseResult.success) {
 			throw new RpcValidationError(
 				`Invalid input for method '${method}'`,
@@ -247,7 +252,12 @@ export class RpcPeer<
 		}
 
 		// Validate input
-		const parseResult = await methodDef.input.safeParseAsync(params);
+		let parseResult: z.ZodSafeParseResult<unknown> = {
+			success: true,
+			data: undefined,
+		};
+		if (methodDef.input)
+			parseResult = await methodDef.input.safeParseAsync(params);
 		if (!parseResult.success) {
 			this.sendError(
 				id,

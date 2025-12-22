@@ -7,8 +7,9 @@
 
 import { RpcPeer } from "../peers/default.js";
 import type { RpcProtocol } from "../protocol.js";
-import type { EventTuple, Provider, RpcSchema } from "../schema.js";
+import type { EventTuple, Method, Provider, RpcSchema } from "../schema.js";
 import type { IMinWebSocket } from "../types.js";
+import { isPromise } from "../utils/promise.js";
 import type {
 	IMultiAdapterHooks,
 	IMultiConnectionAdapter,
@@ -254,7 +255,7 @@ export abstract class MultiPeerBase<
 	 *
 	 * @returns MultiDriver proxy for calling methods on all or specific peers
 	 */
-	public get driver(): MultiDriver<TRemoteSchema> {
+	public get driver(): MultiDriver<TRemoteSchema["methods"]> {
 		return this.createMultiDriver();
 	}
 
@@ -310,23 +311,24 @@ export abstract class MultiPeerBase<
 	/**
 	 * Create a driver proxy for calling remote methods on multiple peers
 	 */
-	private createMultiDriver(): MultiDriver<TRemoteSchema> {
+	private createMultiDriver(): MultiDriver<TRemoteSchema["methods"]> {
 		const methods = this.remoteSchema.methods ?? {};
 		const driver: Record<
 			string,
-			(input: unknown, options?: MultiCallOptions) => Promise<unknown>
+			(
+				...args:
+					| [input: unknown, options?: MultiCallOptions]
+					| [options?: MultiCallOptions]
+			) => unknown | Promise<unknown>
 		> = {};
 
 		for (const methodName of Object.keys(methods)) {
-			driver[methodName] = async (
-				input: unknown,
-				options?: MultiCallOptions,
-			) => {
-				return this.callMethod(methodName, input, options);
+			driver[methodName] = async (...args) => {
+				return this.callMethod(methodName, ...args);
 			};
 		}
 
-		return driver as MultiDriver<TRemoteSchema>;
+		return driver as MultiDriver<TRemoteSchema["methods"]>;
 	}
 
 	/**
@@ -339,11 +341,15 @@ export abstract class MultiPeerBase<
 	 */
 	private async callMethod(
 		method: string,
-		input: unknown,
-		options?: MultiCallOptions,
+		...args:
+			| [input: unknown, options?: MultiCallOptions]
+			| [options?: MultiCallOptions]
 	): Promise<Array<MultiCallResult<unknown>>> {
-		const ids = options?.ids;
-		const timeout = options?.timeout ?? this.timeout;
+		const [input, options] =
+			args.length === 2
+				? args
+				: [undefined, args[0] as MultiCallOptions | undefined];
+		const { ids, timeout = this.timeout } = options ?? {};
 
 		// Determine which peers to call
 		let targetPeers: Array<RpcPeer<TLocalSchema, TRemoteSchema>>;
@@ -363,14 +369,11 @@ export abstract class MultiPeerBase<
 
 		const promises = targetPeers.map(async (peer) => {
 			try {
-				const peerDriver = peer.driver as Record<
-					string,
-					(input: unknown) => Promise<unknown>
-				>;
+				const peerDriver = peer.driver as Record<string, Method>;
 				const callPromise = peerDriver[method]!(input);
 
 				const value = await Promise.race([
-					callPromise,
+					isPromise(callPromise) ? callPromise : Promise.resolve(callPromise),
 					new Promise<never>((_, reject) =>
 						setTimeout(
 							() => reject(new Error(`Timeout after ${timeout}ms`)),

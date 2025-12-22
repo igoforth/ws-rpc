@@ -20,11 +20,14 @@ export interface MethodDef<
 	TOutput extends z.ZodType = z.ZodType,
 > {
 	_type: "method";
-	input: TInput;
+	input?: TInput;
 	output: TOutput;
 }
 
-export type Method = (input: unknown) => unknown | Promise<unknown>;
+export type Method = {
+	(): unknown | Promise<unknown>;
+	(input: unknown): unknown | Promise<unknown>;
+};
 
 /**
  * Event definition with data schema
@@ -53,7 +56,17 @@ export type Event = unknown;
 export function method<
 	TInput extends z.ZodType,
 	TOutput extends z.ZodType,
->(def: { input: TInput; output: TOutput }): MethodDef<TInput, TOutput> {
+>(def: {
+	input: TInput;
+	output: TOutput;
+}): { _type: "method"; input: TInput; output: TOutput };
+export function method<TOutput extends z.ZodType>(def: {
+	output: TOutput;
+}): { _type: "method"; output: TOutput };
+export function method<
+	TInput extends z.ZodType,
+	TOutput extends z.ZodType,
+>(def: { input?: TInput; output: TOutput }): MethodDef<TInput, TOutput> {
 	return { _type: "method", ...def };
 }
 
@@ -94,7 +107,11 @@ export interface RpcCollection {
  *
  * @typeParam T - A MethodDef type to extract the input from
  */
-export type InferInput<T extends MethodDef> = z.input<T["input"]>;
+export type InferInput<T extends MethodDef> = T extends {
+	input: infer I extends z.ZodType;
+}
+	? z.input<I>
+	: void;
 
 /**
  * Infer the output type from a method definition
@@ -113,14 +130,13 @@ export type InferEventData<T extends EventDef> = z.infer<T["data"]>;
 /**
  * Infer method signatures from a schema's methods
  */
-export type InferMethods<T extends RpcSchema["methods"]> =
-	T extends Record<string, MethodDef>
-		? {
-				[K in StringKeys<T>]: (
-					input: z.input<T[K]["input"]>,
-				) => z.output<T[K]["output"]> | Promise<z.output<T[K]["output"]>>;
-			}
-		: Record<string, Method>;
+export type InferMethods<T extends Record<string, MethodDef>> = {
+	[K in StringKeys<T>]: T[K] extends { input?: infer I; output: infer O }
+		? (
+				...args: undefined extends I ? [] : [input: z.input<I>]
+			) => z.output<O> | Promise<z.output<O>>
+		: never;
+};
 
 /**
  * Infer event emitter signatures from a schema's events
@@ -128,7 +144,7 @@ export type InferMethods<T extends RpcSchema["methods"]> =
 export type InferEvents<T extends RpcSchema["events"]> =
 	T extends Record<string, EventDef>
 		? {
-				[K in StringKeys<T>]: z.infer<T[K]["data"]>;
+				[K in StringKeys<T>]: InferEventData<T[K]>;
 			}
 		: Record<string, Event>;
 
@@ -136,20 +152,24 @@ export type InferEvents<T extends RpcSchema["events"]> =
  * Provider type - implements the local methods defined in a schema
  */
 export type Provider<T extends RpcSchema["methods"]> =
-	T extends Record<string, MethodDef> ? InferMethods<T> : {};
+	T extends Record<string, MethodDef>
+		? InferMethods<T>
+		: Record<string, Method>;
 
 /**
  * Driver type - proxy to call remote methods defined in a schema
  */
 export type Driver<T extends RpcSchema["methods"]> =
-	T extends Record<string, MethodDef> ? InferMethods<T> : {};
+	T extends Record<string, MethodDef>
+		? InferMethods<T>
+		: Record<string, Method>;
 
 /**
  * Discriminated event tuple union - enables proper narrowing in switch statements.
  */
 export type EventTuple<T extends RpcSchema["events"]> =
 	T extends Record<string, EventDef>
-		? { [K in keyof T]: [event: K, data: z.infer<T[K]["data"]>] }[keyof T]
+		? { [K in keyof T]: [event: K, data: InferEventData<T[K]>] }[keyof T]
 		: [event: string, data: unknown];
 
 /**

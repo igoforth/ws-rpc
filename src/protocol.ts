@@ -19,7 +19,7 @@ export const RpcRequestSchema = z.object({
 	type: z.literal("rpc:request"),
 	id: z.string(),
 	method: z.string(),
-	params: z.unknown(),
+	params: z.unknown().optional(),
 });
 export type RpcRequest = z.infer<typeof RpcRequestSchema>;
 
@@ -140,7 +140,11 @@ export interface RpcProtocol<TWire extends RpcWireCodec = RpcWireCodec> {
 	readonly codec: TWire;
 
 	/** Create and encode an RPC request */
-	createRequest(id: string, method: string, params: unknown): WireDataOf<TWire>;
+	createRequest(
+		id: string,
+		method: string,
+		params?: unknown,
+	): WireDataOf<TWire>;
 
 	/** Create and encode an RPC response */
 	createResponse(id: string, result: unknown): WireDataOf<TWire>;
@@ -254,7 +258,7 @@ export function createProtocol<
 				type: "rpc:request",
 				id,
 				method,
-				params,
+				...(params !== undefined && { params }),
 			}) as WireDataOf<TWire>;
 		},
 

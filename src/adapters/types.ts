@@ -84,32 +84,17 @@ export type MultiCallResult<T> = {
  * });
  * ```
  */
-export type MultiDriver<TRemoteSchema extends RpcSchema> =
-	TRemoteSchema["methods"] extends Record<string, MethodDef>
+export type MultiDriver<TRemoteMethods extends RpcSchema["methods"]> =
+	TRemoteMethods extends Record<string, MethodDef>
 		? {
-				[K in StringKeys<TRemoteSchema["methods"]>]: <
-					O extends MultiCallOptions,
-				>(
-					input: TRemoteSchema["methods"] extends Record<string, MethodDef>
-						? InferInput<TRemoteSchema["methods"][K]>
-						: never,
-					options?: O,
+				[K in StringKeys<TRemoteMethods>]: <O extends MultiCallOptions = {}>(
+					...args: TRemoteMethods[K] extends { input: any }
+						? [input: InferInput<TRemoteMethods[K]>, options?: O]
+						: [options?: O]
 				) => Promise<
-					O extends { ids: infer I }
-						? string extends I
-							? MultiCallResult<
-									TRemoteSchema["methods"] extends Record<string, MethodDef>
-										? InferOutput<TRemoteSchema["methods"][K]>
-										: never
-								>
-							: Array<
-									MultiCallResult<
-										TRemoteSchema["methods"] extends Record<string, MethodDef>
-											? InferOutput<TRemoteSchema["methods"][K]>
-											: never
-									>
-								>
-						: never
+					O extends { ids: string }
+						? MultiCallResult<InferOutput<TRemoteMethods[K]>>
+						: Array<MultiCallResult<InferOutput<TRemoteMethods[K]>>>
 				>;
 			}
 		: never;
@@ -190,7 +175,7 @@ export interface IMultiConnectionAdapter<
 			[ids?: string[]]
 		> {
 	/** Driver for calling remote methods on connected peers */
-	readonly driver: MultiDriver<TRemoteSchema>;
+	readonly driver: MultiDriver<TRemoteSchema["methods"]>;
 
 	readonly hooks: IMultiAdapterHooks<TLocalSchema, TRemoteSchema>;
 

@@ -43,7 +43,6 @@ export const TestLocalSchema = {
 export const TestRemoteSchema = {
 	methods: {
 		ping: method({
-			input: z.object({}),
 			output: z.object({ pong: z.boolean() }),
 		}),
 	},
