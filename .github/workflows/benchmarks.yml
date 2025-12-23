@@ -152,9 +152,9 @@ jobs:
             !skip { print }
           ' README.md > README.tmp
 
-          # Find where to insert (before "## Multi-Peer Driver Results")
+          # Find where to insert (before "## License")
           awk '
-            /^## Multi-Peer Driver Results$/ {
+            /^## License$/ {
               while ((getline line < "benchmark-section.md") > 0) print line
             }
             { print }

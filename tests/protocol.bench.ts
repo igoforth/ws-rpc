@@ -5,7 +5,7 @@
  * using JSON, MessagePack, and CBOR codecs.
  */
 
-import { afterAll, beforeAll, bench, describe } from "vitest";
+import { bench, describe } from "vitest";
 import { WebSocket, WebSocketServer } from "ws";
 import * as z from "zod";
 import { RpcClient } from "../src/adapters/client.js";
@@ -155,48 +155,28 @@ const logSizes = () => {
 		data: largePayload,
 	});
 
-	console.log("\n📊 Wire sizes (request):");
 	console.log(
-		`  Small:  JSON=${getSize(jsonSmall)}B, MsgPack=${getSize(msgpackSmall)}B, CBOR=${getSize(cborSmall)}B`,
+		`📊 Wire sizes (request):\n  Small:  JSON=${getSize(jsonSmall)}B, MsgPack=${getSize(msgpackSmall)}B, CBOR=${getSize(cborSmall)}B\n  Medium: JSON=${getSize(jsonMedium)}B, MsgPack=${getSize(msgpackMedium)}B, CBOR=${getSize(cborMedium)}B\n  Large:  JSON=${getSize(jsonLarge)}B, MsgPack=${getSize(msgpackLarge)}B, CBOR=${getSize(cborLarge)}B`,
 	);
-	console.log(
-		`  Medium: JSON=${getSize(jsonMedium)}B, MsgPack=${getSize(msgpackMedium)}B, CBOR=${getSize(cborMedium)}B`,
-	);
-	console.log(
-		`  Large:  JSON=${getSize(jsonLarge)}B, MsgPack=${getSize(msgpackLarge)}B, CBOR=${getSize(cborLarge)}B`,
-	);
-	console.log();
 };
 
 logSizes();
 
 // Connections for each codec
-let jsonConn: BenchConnection;
-let msgpackConn: BenchConnection;
-let cborConn: BenchConnection;
-
-beforeAll(async () => {
-	jsonConn = await createConnection(9100, jsonProtocol);
-	msgpackConn = await createConnection(9101, msgpackProtocol);
-	cborConn = await createConnection(9102, cborProtocol);
-	connections.push(jsonConn, msgpackConn, cborConn);
-});
-
-afterAll(() => {
-	for (const conn of connections) {
-		conn.close();
-	}
-});
+const jsonConn = await createConnection(9100, jsonProtocol);
+const msgpackConn = await createConnection(9101, msgpackProtocol);
+const cborConn = await createConnection(9102, cborProtocol);
+connections.push(jsonConn, msgpackConn, cborConn);
 
 // Benchmark options for stable results
 const benchOpts = {
-	time: 2000,
+	time: 1000,
 	iterations: 100,
 	warmupTime: 500,
-	warmupIterations: 20,
+	warmupIterations: 50,
 };
 
-describe("Small payload - RPC roundtrip", () => {
+describe("Small payload - RPC roundtrip", async () => {
 	bench(
 		"JSON",
 		async () => {

@@ -312,31 +312,6 @@ Real WebSocket RPC round-trip benchmarks (GitHub Actions runner, Node.js 22):
 > Benchmarks run automatically via GitHub Actions. Results may vary based on runner load.
 > Run locally with `pnpm bench` for your environment.
 
-## Multi-Peer Driver Results
-
-When calling methods via `server.driver` or `this.driver` in a Durable Object, results are returned as an array:
-
-```typescript
-// Call all connected peers
-const results = await server.driver.getData({});
-
-// Each result contains the peer ID and success/error
-for (const { id, result } of results) {
-  if (result.success) {
-    console.log(`Peer ${id} returned:`, result.value);
-  } else {
-    console.error(`Peer ${id} failed:`, result.error.message);
-  }
-}
-
-// Call specific peers
-const singleResult = await server.driver.getData({}, { ids: "peer-123" });
-const multiResult = await server.driver.getData({}, {
-  ids: ["peer-1", "peer-2"],
-  timeout: 5000,
-});
-```
-
 ## License
 
 MIT
