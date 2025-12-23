@@ -96,6 +96,7 @@ export class TestRpcDO extends withRpc(BaseActor, {
 		by: number;
 	}): Promise<{ counter: number }> {
 		const result = await super.increment(input);
+		this.driver.ping;
 		// Broadcast state change to all clients using emit()
 		this.emit("stateChanged", result);
 		return result;

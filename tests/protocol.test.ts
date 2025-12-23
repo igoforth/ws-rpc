@@ -12,7 +12,7 @@ import {
 	RpcResponseSchema,
 } from "../src/protocol.js";
 
-describe("Protocol Schemas", (it) => {
+describe("Protocol Schemas", () => {
 	describe("RpcRequestSchema", (it) => {
 		it("should validate a valid request", ({ expect }) => {
 			const request = {

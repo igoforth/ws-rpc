@@ -1,21 +1,14 @@
-import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
+import { defineConfig } from "vitest/config";
 
-export default defineWorkersConfig({
+export default defineConfig({
 	test: {
 		include: ["tests/**/*.test.ts"],
+		exclude: ["tests/do/**/*.test.ts"],
 		benchmark: { include: ["tests/**/*.bench.ts"] },
 		coverage: {
-			provider: "istanbul",
+			provider: "v8",
 		},
-		poolOptions: {
-			workers: {
-				main: "./tests/fixtures/test-do.ts",
-				singleWorker: true,
-				isolatedStorage: true,
-				wrangler: {
-					configPath: "./wrangler.jsonc",
-				},
-			},
-		},
+		pool: "vmThreads",
+		poolOptions: { vmThreads: { maxThreads: 4, useAtomics: true } },
 	},
 });
