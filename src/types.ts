@@ -48,6 +48,17 @@ export interface IMinWebSocket {
 	readonly readyState: number;
 }
 
+export interface IWebSocketMessage {
+	[x: string]: unknown;
+	data: unknown;
+}
+
+export interface IWebSocketClose {
+	code: number;
+	reason: string;
+	wasClean: boolean;
+}
+
 /**
  * Extended WebSocket interface with events
  */
@@ -62,8 +73,8 @@ export interface IWebSocket extends IMinWebSocket {
 		listener: (event: unknown) => void,
 	): void;
 	onopen?: ((event: unknown) => void) | null;
-	onclose?: ((event: unknown) => void) | null;
-	onmessage?: ((event: unknown) => void) | null;
+	onclose?: ((event: IWebSocketClose) => void) | null;
+	onmessage?: ((event: IWebSocketMessage) => void) | null;
 	onerror?: ((event: unknown) => void) | null;
 }
 

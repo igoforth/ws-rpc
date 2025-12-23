@@ -132,6 +132,15 @@ type WireInputOf<T extends RpcWireCodec> =
  */
 export type WireInput = string | ArrayBuffer | Uint8Array | Uint8Array[];
 
+export function isWireInput(value: unknown): value is WireInput {
+	return (
+		typeof value === "string" ||
+		value instanceof ArrayBuffer ||
+		value instanceof Uint8Array ||
+		(Array.isArray(value) && value.every((v) => v instanceof Uint8Array))
+	);
+}
+
 /**
  * Protocol interface returned by createProtocol
  */
