@@ -5,7 +5,7 @@
  * Works with Node.js `ws`, Bun's native WebSocket, or any compatible server.
  */
 
-import { RpcPeer } from "../peers/default.js";
+import { isWireInput } from "../protocol.js";
 import type { Provider, RpcSchema } from "../schema.js";
 import {
 	type IRpcOptions,
@@ -115,29 +115,15 @@ export class RpcServer<
 	// =========================================================================
 
 	private handleConnection(ws: IWebSocket): void {
-		const peer = new RpcPeer({
-			ws,
-			localSchema: this.localSchema,
-			remoteSchema: this.remoteSchema,
-			provider: this.provider,
-			...(this.protocol !== undefined && { protocol: this.protocol }),
-			timeout: this.timeout,
-			onEvent: (...args) => {
-				this.hooks.onEvent?.(peer, ...args);
-			},
-		});
-
+		const peer = this.createPeer(ws);
 		this.addPeer(ws, peer);
 
 		ws.onmessage = (event) => {
-			if (
-				typeof event === "object" &&
-				event != null &&
-				"data" in event &&
-				(typeof event.data === "string" || event.data instanceof ArrayBuffer)
-			) {
-				peer.handleMessage(event.data as string | ArrayBuffer);
-			}
+			if (isWireInput(event.data)) peer.handleMessage(event.data);
+			else
+				throw new Error(
+					`Received invalid event type in RpcServer.ws.onmessage ${JSON.stringify(event)}`,
+				);
 		};
 
 		ws.onclose = () => {

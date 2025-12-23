@@ -101,36 +101,18 @@ export abstract class MultiPeerBase<
 	protected createPeer(
 		ws: IMinWebSocket,
 	): RpcPeer<TLocalSchema, TRemoteSchema> {
-		return new RpcPeer<TLocalSchema, TRemoteSchema>({
+		const peer = new RpcPeer<TLocalSchema, TRemoteSchema>({
 			ws,
 			localSchema: this.localSchema,
 			remoteSchema: this.remoteSchema,
 			provider: this.provider,
-			...(this.protocol !== undefined && { protocol: this.protocol }),
-			onEvent: this.hooks.onEvent
-				? (...args) => {
-						const peer = this.findPeerByWs(ws);
-						if (peer) {
-							this.hooks.onEvent?.(peer, ...args);
-						}
-					}
-				: undefined,
 			timeout: this.timeout,
+			...(this.protocol !== undefined && { protocol: this.protocol }),
+			onEvent: (...args) => {
+				this.hooks.onEvent?.(peer, ...args);
+			},
 		});
-	}
-
-	/**
-	 * Find peer by WebSocket (internal helper for event routing)
-	 */
-	private findPeerByWs(
-		ws: IMinWebSocket,
-	): RpcPeer<TLocalSchema, TRemoteSchema> | null {
-		for (const peer of this.peers.values()) {
-			if (peer.getWebSocket() === ws) {
-				return peer;
-			}
-		}
-		return null;
+		return peer;
 	}
 
 	// =========================================================================
@@ -177,7 +159,7 @@ export abstract class MultiPeerBase<
 	 * Get peer by ID
 	 */
 	public getPeer(id: string): RpcPeer<TLocalSchema, TRemoteSchema> | null {
-		for (const peer of this.peers.values()) {
+		for (const peer of this.getPeers()) {
 			if (peer.id === id) {
 				return peer;
 			}
@@ -203,7 +185,7 @@ export abstract class MultiPeerBase<
 	/**
 	 * Get all peers
 	 */
-	public getPeers(): IterableIterator<RpcPeer<TLocalSchema, TRemoteSchema>> {
+	public getPeers(): MapIterator<RpcPeer<TLocalSchema, TRemoteSchema>> {
 		return this.peers.values();
 	}
 
@@ -233,7 +215,7 @@ export abstract class MultiPeerBase<
 	 */
 	public getConnectionCount(): number {
 		let count = 0;
-		for (const peer of this.peers.values()) {
+		for (const peer of this.getPeers()) {
 			if (peer.isOpen) count++;
 		}
 		return count;
@@ -244,7 +226,7 @@ export abstract class MultiPeerBase<
 	 */
 	public getConnectionIds(): string[] {
 		const ids: string[] = [];
-		for (const peer of this.peers.values()) {
+		for (const peer of this.getPeers()) {
 			if (peer.isOpen) ids.push(peer.id);
 		}
 		return ids;
@@ -270,8 +252,10 @@ export abstract class MultiPeerBase<
 		const ids = args[2] as string[] | undefined;
 		const eventArgs = args.slice(0, 2) as EventTuple<TLocalSchema["events"]>;
 		const validPeers = ids
-			? this.peers.values().filter((p) => ids.includes(p.id) && p.isOpen)
-			: this.peers.values().filter((p) => p.isOpen);
+			? Array.from(this.getPeers()).filter(
+					(p) => ids.includes(p.id) && p.isOpen,
+				)
+			: Array.from(this.getPeers()).filter((p) => p.isOpen);
 		for (const peer of validPeers) peer.emit(...eventArgs);
 	}
 
@@ -296,7 +280,7 @@ export abstract class MultiPeerBase<
 	 * Close all peers
 	 */
 	protected closeAll(): void {
-		for (const peer of this.peers.values()) {
+		for (const peer of this.getPeers()) {
 			peer.close();
 			this.hooks.onDisconnect?.(peer);
 		}
@@ -355,7 +339,7 @@ export abstract class MultiPeerBase<
 		let targetPeers: Array<RpcPeer<TLocalSchema, TRemoteSchema>>;
 
 		if (ids === undefined) {
-			targetPeers = Array.from(this.peers.values()).filter((p) => p.isOpen);
+			targetPeers = Array.from(this.getPeers()).filter((p) => p.isOpen);
 		} else if (typeof ids === "string") {
 			const peer = this.getPeer(ids);
 			targetPeers = peer?.isOpen ? [peer] : [];

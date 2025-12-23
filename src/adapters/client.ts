@@ -7,11 +7,12 @@
 
 import type { Constructor } from "type-fest";
 import { RpcPeer } from "../peers/default.js";
-import type { RpcProtocol, WireInput } from "../protocol.js";
+import { isWireInput, type RpcProtocol } from "../protocol.js";
 import type { Driver, EventTuple, Provider, RpcSchema } from "../schema.js";
 import {
 	type IRpcOptions,
 	type IWebSocket,
+	type IWebSocketClose,
 	type WebSocketOptions,
 	WebSocketReadyState,
 } from "../types.js";
@@ -169,7 +170,7 @@ export class RpcClient<
 	 * @returns Promise that resolves when connected
 	 * @throws Error if connection fails
 	 */
-	async connect(): Promise<void> {
+	connect(): void | Promise<void> {
 		if (this._state === "connected" || this._state === "connecting") {
 			return;
 		}
@@ -195,21 +196,16 @@ export class RpcClient<
 			const onError = (event: unknown) => {
 				cleanup();
 				this._state = "disconnected";
-				reject(new Error(`WebSocket connection failed: ${event}`));
+				reject(
+					new Error(`WebSocket connection failed: ${JSON.stringify(event)}`),
+				);
 			};
 
 			const onClose = (event: unknown) => {
 				cleanup();
+				const typed = event as IWebSocketClose;
 				this._state = "disconnected";
-				const code =
-					typeof event === "object" && event != null && "code" in event
-						? event.code
-						: "Unknown code";
-				const reason =
-					typeof event === "object" && event != null && "reason" in event
-						? event.reason
-						: "Unknown reason";
-				reject(new Error(`WebSocket closed: ${code} ${reason}`));
+				reject(new Error(`WebSocket closed: ${typed.code} ${typed.reason}`));
 			};
 
 			const cleanup = () => {
@@ -269,8 +265,7 @@ export class RpcClient<
 
 		// Set up WebSocket event handlers
 		this.ws.onmessage = (event) => {
-			if (typeof event === "object" && event != null && "data" in event)
-				this.peer?.handleMessage(event.data as WireInput);
+			if (isWireInput(event.data)) this.peer?.handleMessage(event.data);
 			else
 				throw new Error(
 					`Received invalid event type in RpcClient.ws.onmessage ${JSON.stringify(event)}`,
@@ -278,19 +273,7 @@ export class RpcClient<
 		};
 
 		this.ws.onclose = (event) => {
-			if (
-				typeof event === "object" &&
-				event != null &&
-				"code" in event &&
-				"reason" in event &&
-				typeof event.code === "number" &&
-				typeof event.reason === "string"
-			)
-				this.handleClose(event.code, event.reason);
-			else
-				throw new Error(
-					`Received invalid event type in RpcClient.ws.onclose ${JSON.stringify(event)}`,
-				);
+			this.handleClose(event.code, event.reason);
 		};
 
 		this.ws.onerror = (event) => {

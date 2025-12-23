@@ -50,8 +50,27 @@
  * pending calls to durable storage.
  */
 
-import type { Actor } from "@cloudflare/actors";
+import type { DurableObjectStorage } from "@cloudflare/workers-types";
 import type { Constructor } from "type-fest";
+
+/**
+ * Minimal interface for Actor-like classes compatible with withRpc.
+ *
+ * This decouples ws-rpc from any specific Actor implementation (e.g. @cloudflare/actors,
+ * @polymarket/actors, or custom implementations). Any class that implements this interface
+ * can be used as a base for the withRpc mixin.
+ *
+ * Note: WebSocket lifecycle methods (onWebSocketConnect, etc.) are not included here
+ * because they are `protected` in Actor classes. The mixin can still override them
+ * from the base class without requiring them in this interface.
+ */
+export interface ActorLike {
+	/** Storage with access to raw DurableObjectStorage for SQL-backed pending calls */
+	storage?: {
+		raw: DurableObjectStorage | undefined;
+	};
+}
+
 import { RpcPeer } from "../peers/default.js";
 import {
 	createDurableRpcPeerFactory,
@@ -228,7 +247,7 @@ export interface IRpcActorHooks<
  * Runtime enforces this when methods are called via RPC.
  */
 export type RpcActorConstructor<
-	TBase extends Constructor<Actor<unknown>>,
+	TBase extends Constructor<ActorLike>,
 	TLocalSchema extends RpcSchema,
 	TRemoteSchema extends RpcSchema,
 > = {
@@ -285,8 +304,7 @@ export type RpcActorConstructor<
 export function withRpc<
 	TLocalSchema extends RpcSchema,
 	TRemoteSchema extends RpcSchema,
-	TEnv,
-	TBase extends Constructor<Actor<TEnv>> & {
+	TBase extends Constructor<ActorLike> & {
 		prototype: Provider<TLocalSchema["methods"]>;
 	},
 >(
