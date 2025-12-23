@@ -8,7 +8,7 @@ import {
 	method,
 } from "../src/schema.js";
 
-describe("Schema Helpers", (it) => {
+describe("Schema Helpers", () => {
 	describe("method()", (it) => {
 		it("should create a method definition with input and output schemas", ({
 			expect,

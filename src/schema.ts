@@ -5,7 +5,7 @@
  * enabling TypeScript type inference for the entire RPC contract.
  */
 
-import type { LiteralUnion } from "type-fest";
+import type { LiteralUnion, NonEmptyObject } from "type-fest";
 import type * as z from "zod";
 
 export type StringKeys<T> = keyof T extends string ? keyof T : never;
@@ -168,7 +168,7 @@ export type Driver<T extends RpcSchema["methods"]> =
  * Discriminated event tuple union - enables proper narrowing in switch statements.
  */
 export type EventTuple<T extends RpcSchema["events"]> =
-	T extends Record<string, EventDef>
+	T extends NonEmptyObject<Record<string, EventDef>>
 		? { [K in keyof T]: [event: K, data: InferEventData<T[K]>] }[keyof T]
 		: [event: string, data: unknown];
 
