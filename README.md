@@ -305,9 +305,9 @@ Real WebSocket RPC round-trip benchmarks (GitHub Actions runner, Node.js 22):
 **Throughput (ops/sec):**
 | Payload | JSON | MessagePack | CBOR | Fastest |
 |---------|------|-------------|------|---------|
-| Small | 24700 | 19563 | 16151 | JSON |
-| Medium | 8091 | 4235 | 7406 | JSON |
-| Large | 1891 | 734 | 1666 | JSON |
+| Small | 13636 | 11312 | 9249 | JSON |
+| Medium | 5323 | 2998 | 4635 | JSON |
+| Large | 1431 | 551 | 1194 | JSON |
 
 > Benchmarks run automatically via GitHub Actions. Results may vary based on runner load.
 > Run locally with `pnpm bench` for your environment.
